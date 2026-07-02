@@ -19,6 +19,8 @@ interface BoardState {
   setRange: (r: TimeRange) => void;
   focus: string | null;
   setFocus: (s: string | null) => void;
+  hovered: string | null;
+  setHovered: (s: string | null) => void;
   scenario: string;
   setScenario: (s: string) => void;
   live: boolean;
@@ -32,6 +34,7 @@ export function BoardProvider({ children }: { children: ReactNode }) {
   const [env, setEnv] = useState<Env>("prod");
   const [range, setRange] = useState<TimeRange>("1h");
   const [focus, setFocus] = useState<string | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
   const [scenario, setScenarioState] = useState<string>("flag_spike");
   // Switching scenarios changes the root service, so drop any stale focus.
   const setScenario = (s: string) => {
@@ -54,10 +57,10 @@ export function BoardProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({
-      env, setEnv, range, setRange, focus, setFocus,
+      env, setEnv, range, setRange, focus, setFocus, hovered, setHovered,
       scenario, setScenario, live, setLive, demo,
     }),
-    [env, range, focus, scenario, live, demo],
+    [env, range, focus, hovered, scenario, live, demo],
   );
   return <BoardContext.Provider value={value}>{children}</BoardContext.Provider>;
 }

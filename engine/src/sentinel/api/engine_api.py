@@ -259,12 +259,9 @@ def api_topology(scenario: str = Query("flag_spike")):
     }
 
 
-@app.get("/changes")
-def api_changes(scenario: str = Query("flag_spike")):
-    """Rank changes by the engine's score (service-match × onset-proximity) and,
-    for the differentiator, annotate each with its naive recency rank."""
-    scenario = _scn(scenario)
-    a = _analysis(scenario)
+def _rank_changes(a: dict):
+    """Rank a scenario's changes by engine score (service-match × onset-proximity),
+    annotated with naive recency rank. Shared by /changes and /runbook."""
     store = a["store"]
     changes = store["changes"]
     root = a.get("culprit")
@@ -272,7 +269,6 @@ def api_changes(scenario: str = Query("flag_spike")):
     cause = a.get("cause")
     onset = a.get("detect_t", INC)
 
-    # naive baseline: rank purely by most-recent-first
     order = sorted(range(len(changes)), key=lambda i: changes[i]["t"], reverse=True)
     recency_rank = {i: r + 1 for r, i in enumerate(order)}
 
@@ -286,24 +282,104 @@ def api_changes(scenario: str = Query("flag_spike")):
         else:
             service_match = 0.1
         onset_prox = math.exp(-abs(c["t"] - onset) / tau)
-        score = service_match * onset_prox
-        is_root = bool(
-            cause and c["service"] == cause["service"] and c["t"] == cause["t"]
-        )
-        items.append(
-            {
-                "service": c["service"],
-                "change": c["change"],
-                "t": c["t"],
-                "score": round(score, 4),
-                "serviceMatch": round(service_match, 2),
-                "onsetProximity": round(onset_prox, 4),
-                "recencyRank": recency_rank[i],
-                "isRoot": is_root,
-            }
-        )
+        items.append({
+            "service": c["service"], "change": c["change"], "t": c["t"],
+            "score": round(service_match * onset_prox, 4),
+            "serviceMatch": round(service_match, 2),
+            "onsetProximity": round(onset_prox, 4),
+            "recencyRank": recency_rank[i],
+            "isRoot": bool(cause and c["service"] == cause["service"] and c["t"] == cause["t"]),
+        })
     items.sort(key=lambda x: x["score"], reverse=True)
-    return {"items": items, "onsetT": onset, "root": root, "demo": DATA_SOURCE == "demo"}
+    return items, onset
+
+
+@app.get("/changes")
+def api_changes(scenario: str = Query("flag_spike")):
+    """Rank changes by the engine's score (service-match × onset-proximity) and,
+    for the differentiator, annotate each with its naive recency rank."""
+    a = _analysis(_scn(scenario))
+    items, onset = _rank_changes(a)
+    return {"items": items, "onsetT": onset, "root": a.get("culprit"),
+            "demo": DATA_SOURCE == "demo"}
+
+
+@app.get("/runbook")
+def api_runbook(scenario: str = Query("flag_spike")):
+    """A complete, human-readable incident runbook as Markdown — method,
+    confidence, failure modes, blast radius, and the change ranking (engine
+    score vs naive recency), captured verbatim for post-incident review and
+    compliance. Assistive: it records a proposal, not an executed action."""
+    scenario = _scn(scenario)
+    a = _analysis(scenario)
+    meta = next((m for m in SCENARIO_META if m["id"] == scenario), {"label": scenario})
+    if not a["detected"]:
+        md = f"# Incident runbook — {meta.get('label', scenario)}\n\nNo SLO breach detected in the window.\n"
+        return {"scenario": scenario, "markdown": md}
+
+    tools, t = a["tools"], a["detect_t"]
+    root, elevated, cause = a["culprit"], a["elevated"], a["cause"]
+    items, _ = _rank_changes(a)
+    lat0 = round(_baseline(tools, root, "latency_p95"))
+    lat1 = round(float(tools.query_metric(root, "latency_p95", t, t + 1)[0]))
+    traces = tools.get_error_traces(root)
+    span = traces[0]["error_span"] if traces else "n/a"
+    error_pct = {s: round(v * 100) for s, v in elevated.items()}
+    conf = _confidence(elevated, root, bool(cause))
+
+    blast = "\n".join(
+        f"- `{s}` — {error_pct[s]}%" for s in sorted(elevated, key=elevated.get, reverse=True)
+    )
+    rows = "\n".join(
+        f"| {i+1} | `{c['service']}` | {c['change']} | {c['score']:.3f} | {c['recencyRank']} | {'**yes**' if c['isRoot'] else 'no'} |"
+        for i, c in enumerate(items)
+    )
+    fmodes = "\n".join(f"- {f}" for f in FAILURE_MODES)
+    change_line = (
+        f"`{cause['change']}` on `{root}` at t={cause['t']}m"
+        if cause else "no change found on the root service near onset"
+    )
+
+    md = f"""# Incident runbook — {meta.get('label', scenario)}
+_Assistive · human approval required before any action._
+
+## Summary
+- **When:** detected t={t}m (began t={INC}m · **MTTD {t - INC}m**)
+- **Severity:** SLO breach — **{error_pct[root]}%** errors on `{root}` vs {SLO_ERR*100:.0f}% budget
+- **Root service:** `{root}` — dependents' errors are explained by it, and it depends on nothing elevated, so it is the **cause, not a symptom**.
+- **Confidence:** {round(conf*100)}% _(heuristic: separation of the root's error from the next-loudest service, plus change correlation)_
+
+## Blast radius
+{blast}
+
+## Evidence
+- p95 latency {lat0}ms → **{lat1}ms**
+- failing span `{span}`
+- root-cause change: {change_line}
+
+## Change correlation — engine score vs naive recency
+| # | service | change | score | recency rank | root cause |
+|---|---|---|---|---|---|
+{rows}
+
+The engine ranks by **service-match × onset-proximity**, so the true cause tops the list even when a more recent change would mislead a recency heuristic.
+
+## Proposed action _(awaits human approval)_
+1. Roll back {change_line}.
+2. Confirm recovery.
+
+The engine proposes; it does not act. No remediation is executed without a human.
+
+## Method
+{METHOD}
+
+## When this can be wrong
+{fmodes}
+
+---
+_Produced by the Sentinel engine at runtime · scenario `{scenario}` · source {DATA_SOURCE}._
+"""
+    return {"scenario": scenario, "root": root, "markdown": md}
 
 
 def _slice(range_key: str):

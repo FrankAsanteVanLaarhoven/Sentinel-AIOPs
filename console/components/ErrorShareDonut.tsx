@@ -11,13 +11,15 @@ const statusColor = (s: string, dim = false) =>
   s === "root" ? C.crit : s === "warn" ? C.warn : dim ? C.dim : C.ok;
 
 export function ErrorShareDonut() {
-  const { focus, setFocus } = useBoard();
+  const { focus, setFocus, hovered, setHovered } = useBoard();
   const { data, isLoading, isError } = usePanels();
 
   const option = useMemo<EChartsOption | null>(() => {
     if (!data) return null;
     const rows = data.errorShare.filter((r) => r.value > 0);
     const total = rows.reduce((s, r) => s + r.value, 0);
+    const muted = (svc: string) =>
+      (focus && focus !== svc) || (hovered && hovered !== svc);
     return {
       backgroundColor: "transparent",
       animation: false,
@@ -44,7 +46,9 @@ export function ErrorShareDonut() {
             value: r.value,
             itemStyle: {
               color: statusColor(r.status),
-              opacity: focus && focus !== r.service ? 0.32 : 1,
+              opacity: muted(r.service) ? 0.28 : 1,
+              borderColor: hovered === r.service ? "var(--pearl)" : C.panel2,
+              borderWidth: hovered === r.service ? 1.5 : 1,
             },
           })),
         },
@@ -72,7 +76,7 @@ export function ErrorShareDonut() {
         ],
       },
     };
-  }, [data, focus]);
+  }, [data, focus, hovered]);
 
   return (
     <Panel title="Error share" right="by service" className="area-dn min-h-[200px]">
@@ -90,6 +94,8 @@ export function ErrorShareDonut() {
               onEvents={{
                 click: (p: { name?: string }) =>
                   p.name && setFocus(focus === p.name ? null : p.name),
+                mouseover: (p: { name?: string }) => p.name && setHovered(p.name),
+                mouseout: () => setHovered(null),
               }}
             />
           </div>
@@ -100,8 +106,17 @@ export function ErrorShareDonut() {
                 <button
                   key={r.service}
                   onClick={() => setFocus(focus === r.service ? null : r.service)}
-                  className="mono text-[9px] flex items-center gap-1"
-                  style={{ color: focus && focus !== r.service ? C.dim : C.mist }}
+                  onMouseEnter={() => setHovered(r.service)}
+                  onMouseLeave={() => setHovered(null)}
+                  className="mono text-[9px] flex items-center gap-1 transition-colors"
+                  style={{
+                    color:
+                      (focus && focus !== r.service) || (hovered && hovered !== r.service)
+                        ? C.dim
+                        : hovered === r.service
+                          ? C.pearl
+                          : C.mist,
+                  }}
                 >
                   <span className="dot" style={{ background: statusColor(r.status) }} />
                   {r.service}

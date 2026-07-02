@@ -27,23 +27,29 @@ type SvcData = {
   rps: number;
   errorPct: number;
   focused: boolean;
+  hovered: boolean;
+  dim: boolean;
 };
 
 function SvcNode({ data }: NodeProps) {
   const d = data as SvcData;
   const color = STATUS[d.status];
+  const ring = d.focused
+    ? `0 0 0 2px var(--ice)`
+    : d.hovered
+      ? `0 0 0 2px var(--ice)`
+      : d.status === "root"
+        ? `0 0 0 4px rgba(255,106,77,.18)`
+        : "none";
   return (
     <div
-      className="rounded-lg border bg-[var(--panel-2)] px-3 py-2 text-center select-none"
+      className="rounded-lg border bg-[var(--panel-2)] px-3 py-2 text-center select-none transition-opacity duration-150"
       style={{
         borderColor: color,
         borderWidth: 1.5,
         minWidth: 112,
-        boxShadow: d.focused
-          ? `0 0 0 2px var(--ice)`
-          : d.status === "root"
-            ? `0 0 0 4px rgba(255,106,77,.18)`
-            : "none",
+        opacity: d.dim ? 0.4 : 1,
+        boxShadow: ring,
         animation: d.status === "root" ? "pulse-ring 2.2s infinite" : undefined,
       }}
     >
@@ -104,7 +110,7 @@ async function fetchTopology(scenario: string): Promise<Topology> {
 }
 
 export function TopologyGraph() {
-  const { focus, setFocus, scenario } = useBoard();
+  const { focus, setFocus, hovered, setHovered, scenario } = useBoard();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["topology", scenario],
     queryFn: () => fetchTopology(scenario),
@@ -123,21 +129,27 @@ export function TopologyGraph() {
         rps: s.rps,
         errorPct: s.errorPct,
         focused: focus === s.id,
+        hovered: hovered === s.id,
+        dim: !!hovered && hovered !== s.id && focus !== s.id,
       } satisfies SvcData,
       draggable: false,
     }));
-    const edges: Edge[] = data.edges.map((e, i) => ({
-      id: `e${i}`,
-      source: e.source,
-      target: e.target,
-      animated: e.erroring,
-      style: {
-        stroke: e.erroring ? "var(--crit)" : "rgba(255,255,255,.16)",
-        strokeWidth: e.erroring ? 1.8 : 1,
-      },
-    }));
+    const edges: Edge[] = data.edges.map((e, i) => {
+      const active = hovered === e.source || hovered === e.target;
+      return {
+        id: `e${i}`,
+        source: e.source,
+        target: e.target,
+        animated: e.erroring,
+        style: {
+          stroke: e.erroring ? "var(--crit)" : "rgba(255,255,255,.16)",
+          strokeWidth: e.erroring ? (active ? 2.6 : 1.8) : active ? 1.6 : 1,
+          opacity: hovered && !active ? 0.25 : 1,
+        },
+      };
+    });
     return { nodes, edges };
-  }, [data, focus]);
+  }, [data, focus, hovered]);
 
   return (
     <Panel
@@ -163,6 +175,8 @@ export function TopologyGraph() {
             panOnScroll
             onNodeClick={(_, n) => setFocus(focus === n.id ? null : n.id)}
             onPaneClick={() => setFocus(null)}
+            onNodeMouseEnter={(_, n) => setHovered(n.id)}
+            onNodeMouseLeave={() => setHovered(null)}
           >
             <Background color="rgba(255,255,255,.05)" gap={18} />
           </ReactFlow>

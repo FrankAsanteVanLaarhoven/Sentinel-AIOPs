@@ -62,4 +62,8 @@ export const engine = {
     ),
   frame: (scenario = "flag_spike") => get<Frame>(`/frame?scenario=${enc(scenario)}`),
   panels: (scenario = "flag_spike") => get<Panels>(`/panels?scenario=${enc(scenario)}`),
+  runbook: (scenario = "flag_spike") =>
+    get<{ scenario: string; root?: string; markdown: string }>(
+      `/runbook?scenario=${enc(scenario)}`,
+    ),
 };

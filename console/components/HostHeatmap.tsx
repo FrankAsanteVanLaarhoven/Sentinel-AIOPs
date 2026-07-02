@@ -7,12 +7,26 @@ import { Panel, PanelMessage } from "./Panel";
 const cellColor = (c: string) =>
   c === "crit" ? "var(--crit)" : c === "warn" ? "var(--warn)" : "var(--ok)";
 
-function Group({ h, dim, onClick }: { h: HostGroup; dim: boolean; onClick: () => void }) {
+function Group({
+  h,
+  dim,
+  hot,
+  onClick,
+  onHover,
+}: {
+  h: HostGroup;
+  dim: boolean;
+  hot: boolean;
+  onClick: () => void;
+  onHover: (v: boolean) => void;
+}) {
   return (
     <button
       onClick={onClick}
-      className="text-left rounded-md border border-[var(--line)] bg-[var(--panel-2)] px-2.5 py-2 flex flex-col gap-1.5 transition-opacity"
-      style={{ opacity: dim ? 0.4 : 1 }}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      className="text-left rounded-md border bg-[var(--panel-2)] px-2.5 py-2 flex flex-col gap-1.5 transition-opacity"
+      style={{ opacity: dim ? 0.4 : 1, borderColor: hot ? "var(--ice)" : "var(--line)" }}
     >
       <div className="flex items-center justify-between">
         <span className="mono text-[10px] text-[var(--silver)] truncate">{h.service}</span>
@@ -38,7 +52,7 @@ function Group({ h, dim, onClick }: { h: HostGroup; dim: boolean; onClick: () =>
 }
 
 export function HostHeatmap() {
-  const { focus, setFocus } = useBoard();
+  const { focus, setFocus, hovered, setHovered } = useBoard();
   const { data, isLoading, isError } = usePanels();
 
   return (
@@ -51,8 +65,10 @@ export function HostHeatmap() {
             <Group
               key={h.service}
               h={h}
-              dim={!!focus && focus !== h.service}
+              dim={(!!focus && focus !== h.service) || (!!hovered && hovered !== h.service)}
+              hot={hovered === h.service}
               onClick={() => setFocus(focus === h.service ? null : h.service)}
+              onHover={(v) => setHovered(v ? h.service : null)}
             />
           ))}
         </div>

@@ -11,13 +11,30 @@ async function fetchChanges(scenario: string): Promise<Changes> {
   return res.json();
 }
 
-function Row({ c, rank, max }: { c: ChangeItem; rank: number; max: number }) {
+function Row({
+  c,
+  rank,
+  max,
+  hot,
+  onHover,
+}: {
+  c: ChangeItem;
+  rank: number;
+  max: number;
+  hot: boolean;
+  onHover: (v: boolean) => void;
+}) {
   const root = c.isRoot;
   // A change whose recency rank is better (lower) than its engine rank is what a
   // naive "most-recent-change" heuristic would have wrongly surfaced first.
   const recencyMisleads = c.recencyRank < rank + 1 && !root;
   return (
-    <li className="rounded-md border border-[var(--line)] bg-[var(--panel-2)] px-3 py-2">
+    <li
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      className="rounded-md border bg-[var(--panel-2)] px-3 py-2 transition-colors"
+      style={{ borderColor: hot ? "var(--ice)" : "var(--line)" }}
+    >
       <div className="flex items-center justify-between mono text-[11px]">
         <span className="flex items-center gap-1.5" style={{ color: root ? "var(--crit)" : "var(--silver)" }}>
           <span className="tnum">#{rank + 1}</span>
@@ -60,7 +77,7 @@ function Row({ c, rank, max }: { c: ChangeItem; rank: number; max: number }) {
 }
 
 export function ChangeRanking() {
-  const { scenario } = useBoard();
+  const { scenario, hovered, setHovered } = useBoard();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["changes", scenario],
     queryFn: () => fetchChanges(scenario),
@@ -82,7 +99,14 @@ export function ChangeRanking() {
         <div className="flex flex-col gap-2">
           <ul className="flex flex-col gap-2">
             {items.map((c, i) => (
-              <Row key={`${c.service}-${c.t}`} c={c} rank={i} max={max} />
+              <Row
+                key={`${c.service}-${c.t}`}
+                c={c}
+                rank={i}
+                max={max}
+                hot={hovered === c.service}
+                onHover={(v) => setHovered(v ? c.service : null)}
+              />
             ))}
           </ul>
           {differentiates && (

@@ -5,6 +5,7 @@ import { useBoard } from "@/lib/board";
 import type { Incident, InvestigationStep } from "@/lib/types";
 import { Panel, PanelMessage } from "./Panel";
 import { Badge, ConfidenceChip } from "./ui";
+import { ExportRunbook } from "./ExportRunbook";
 
 async function fetchIncident(scenario: string): Promise<Incident> {
   const res = await fetch(`/api/incident?scenario=${encodeURIComponent(scenario)}`);
@@ -108,7 +109,11 @@ function Timeline({ steps }: { steps: InvestigationStep[] }) {
         const tone = STEP_TONE[s.key];
         const last = i === steps.length - 1;
         return (
-          <li key={s.key} className="flex gap-3">
+          <li
+            key={s.key}
+            className="flex gap-3 step-in"
+            style={{ animationDelay: `${i * 70}ms` }}
+          >
             {/* rail */}
             <div className="flex flex-col items-center pt-1">
               <span
@@ -227,12 +232,17 @@ export function InvestigationPanel() {
                 ))}
               </ul>
             </details>
-            {data.confidence != null && (
-              <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
+              {data.confidence != null ? (
                 <ConfidenceChip value={data.confidence} />
-                <span className="mono text-[9px] text-[var(--dim)]">assistive · proposes only</span>
-              </div>
-            )}
+              ) : (
+                <span />
+              )}
+              <ExportRunbook scenario={scenario} />
+            </div>
+            <span className="mono text-[9px] text-[var(--dim)] text-right block">
+              assistive · proposes only
+            </span>
           </div>
         </>
       )}
