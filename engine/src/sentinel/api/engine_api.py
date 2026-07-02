@@ -405,11 +405,9 @@ _LOG_ANOMALY_CARD = {
 }
 
 
-@app.get("/log-anomaly")
-def api_log_anomaly():
-    """The learned detector's model card: real-HDFS held-out metrics + caveats +
-    the architectural boundary. Reflects a fresh `make train-logdet` run if its
-    artifact is present, otherwise the documented envelope."""
+def _log_anomaly_card():
+    """The learned detector's card: documented envelope, overlaid with a fresh
+    `make train-logdet` run if its artifact is present. Hermetic either way."""
     card = dict(_LOG_ANOMALY_CARD)
     fresh = _ART / "log_anomaly_card.json"
     if fresh.exists():
@@ -422,6 +420,12 @@ def api_log_anomaly():
         except Exception:
             pass
     return card
+
+
+@app.get("/log-anomaly")
+def api_log_anomaly():
+    """Learned log-anomaly detector card: real-HDFS held-out metrics + caveats."""
+    return _log_anomaly_card()
 
 
 # Measured envelope of the localization validation harness (docs/RCA_VALIDATION.md).
@@ -441,11 +445,9 @@ _RCA_VALIDATION_CARD = {
 }
 
 
-@app.get("/rca-validation")
-def api_rca_validation():
-    """Localization accuracy on the real PetShop RCA corpus (recall@1 / recall@3
-    of the deterministic causal rule), with disclosed failure modes. Reflects a
-    fresh `make validate-rca` run if its artifact is present."""
+def _rca_validation_card():
+    """The localization-validation card: documented PetShop baseline, overlaid
+    with a fresh `make validate-rca` run if its artifact is present."""
     card = dict(_RCA_VALIDATION_CARD)
     fresh = _ART / "rca_validation_card.json"
     if fresh.exists():
@@ -458,6 +460,53 @@ def api_rca_validation():
         except Exception:
             pass
     return card
+
+
+@app.get("/rca-validation")
+def api_rca_validation():
+    """Localization accuracy on the real PetShop RCA corpus (recall@1 / recall@3
+    of the deterministic causal rule), with disclosed failure modes."""
+    return _rca_validation_card()
+
+
+@app.get("/validation")
+def api_validation():
+    """One queryable view of the three-layer honesty story: the learned detection
+    envelope, the deterministic localizer, and its measured real-incident
+    baseline — all retrievable without running any training/validation pipeline."""
+    return {
+        "principle": (
+            "Detection may be learned on real public data; localization and change "
+            "correlation stay deterministic, inspectable, and validated against ground truth."
+        ),
+        "layers": [
+            {
+                "id": "detection",
+                "title": "Detection",
+                "kind": "learned",
+                "subtitle": "logs & metrics — statistical models on real public data",
+                "card": _log_anomaly_card(),
+            },
+            {
+                "id": "localization",
+                "title": "Localization",
+                "kind": "deterministic",
+                "subtitle": "root-service identification via error-propagation graph analysis",
+                "card": {
+                    "rule": "causal_root — a service is root iff no dependency is also elevated",
+                    "trained": False,
+                    "note": "Inspectable and replayable from topology + change feed. No model weights.",
+                },
+            },
+            {
+                "id": "validation",
+                "title": "Validation",
+                "kind": "empirical",
+                "subtitle": "the deterministic rule scored on a real labelled RCA corpus",
+                "card": _rca_validation_card(),
+            },
+        ],
+    }
 
 
 def _slice(range_key: str):

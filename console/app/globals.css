@@ -105,7 +105,8 @@ body {
     "gs gs gs gs gs gs gs gs topo topo topo topo"
     "cr cr cr cr dn dn dn dn topo topo topo topo"
     "hh hh hh hh hh hh hh hh sp sp sp sp"
-    "tw tw tw tw tw tw tw tw lh lh lh lh";
+    "tw tw tw tw tw tw tw tw lh lh lh lh"
+    "val val val val val val val val val val val val";
 }
 /* Tablet: two-up cards, panels stack more forgivingly */
 @media (max-width: 1179px) {
@@ -118,14 +119,15 @@ body {
       "topo topo"
       "cr dn"
       "hh sp"
-      "tw lh";
+      "tw lh"
+      "val val";
   }
 }
 @media (max-width: 720px) {
   .board-panels {
     grid-template-columns: 1fr;
     grid-template-areas:
-      "s1" "s2" "s3" "s4" "gs" "topo" "cr" "dn" "hh" "sp" "tw" "lh";
+      "s1" "s2" "s3" "s4" "gs" "topo" "cr" "dn" "hh" "sp" "tw" "lh" "val";
   }
 }
 
@@ -141,6 +143,7 @@ body {
 .area-sp { grid-area: sp; min-width: 0; }
 .area-tw { grid-area: tw; min-width: 0; }
 .area-lh { grid-area: lh; min-width: 0; }
+.area-val { grid-area: val; min-width: 0; }
 
 /* ------------------------------------------------------------------ *
  * Skeletons (velvet shimmer) + status utilities

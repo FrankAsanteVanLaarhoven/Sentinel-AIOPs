@@ -143,3 +143,43 @@ export interface Frame {
   elevatedCount: number;
   demo?: boolean;
 }
+
+// The three-layer honesty story (GET /validation) — cards retrievable without
+// running any training/validation pipeline.
+export interface DetectionCard {
+  dataset: string;
+  model: string;
+  source: string;
+  heldout_sessions: number;
+  anomaly_rate: number;
+  metrics: { precision: number; recall: number; f1: number; roc_auc: number };
+  caveats: string[];
+  boundary: string;
+}
+export interface LocalizationCard {
+  rule: string;
+  trained: boolean;
+  note: string;
+}
+export interface ValidationCard {
+  dataset: string;
+  rule: string;
+  source: string;
+  incidents: number;
+  recall_at_1: number;
+  recall_at_3: number;
+  detection_coverage: number;
+  failure_modes: string[];
+  boundary: string;
+}
+export interface ValidationLayer {
+  id: "detection" | "localization" | "validation";
+  title: string;
+  kind: "learned" | "deterministic" | "empirical";
+  subtitle: string;
+  card: DetectionCard | LocalizationCard | ValidationCard;
+}
+export interface Validation {
+  principle: string;
+  layers: ValidationLayer[];
+}

@@ -10,6 +10,7 @@ import type {
   Frame,
   Panels,
   ScenarioMeta,
+  Validation,
 } from "./types";
 
 const enc = encodeURIComponent;
@@ -66,4 +67,6 @@ export const engine = {
     get<{ scenario: string; root?: string; markdown: string }>(
       `/runbook?scenario=${enc(scenario)}`,
     ),
+  // Static across scenarios; cache for an hour.
+  validation: () => get<Validation>("/validation", 3600),
 };

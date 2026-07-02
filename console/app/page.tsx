@@ -9,6 +9,7 @@ import { HostHeatmap } from "@/components/HostHeatmap";
 import { SpanThroughput } from "@/components/SpanThroughput";
 import { TraceWaterfall } from "@/components/TraceWaterfall";
 import { LatencyHeatmap } from "@/components/LatencyHeatmap";
+import { ValidationPanel } from "@/components/ValidationPanel";
 
 // The shell + the full 12-column board. Every panel is engine-wired and owns
 // its own data fetch; the human-gated investigation anchors the left column.
@@ -40,6 +41,9 @@ export default function DashboardPage() {
           <SpanThroughput />
           <TraceWaterfall />
           <LatencyHeatmap />
+
+          {/* Validation — the three-layer honesty story, engine-served ★ */}
+          <ValidationPanel />
         </div>
       </div>
     </main>
