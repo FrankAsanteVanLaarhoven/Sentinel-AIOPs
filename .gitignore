@@ -1,0 +1,20 @@
+# dependencies / build
+**/node_modules/
+**/.next/
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/venv/
+**/.pytest_cache/
+
+# env & secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# generated demo outputs (regenerable via `make demo`)
+engine/artifacts/
+
+# agent tooling convention files (kept locally, not committed)
+CLAUDE.md
+**/CLAUDE.md

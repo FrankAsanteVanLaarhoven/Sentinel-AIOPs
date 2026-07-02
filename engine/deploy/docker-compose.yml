@@ -1,0 +1,33 @@
+# Full self-hosted observability stack: instrument once (OTLP), get metrics+traces+logs.
+services:
+  productcatalog:
+    build: ..
+    environment:
+      SERVICE_NAME: productcatalog
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      FEATURE_FLAG_NEW_RANKING: "0"   # set to 1 to reproduce the incident
+    ports: ["8000:8000"]
+    depends_on: [otel-collector]
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes: ["./otel-collector.yaml:/etc/otelcol/config.yaml:ro"]
+    ports: ["4317:4317","4318:4318","8889:8889"]
+  prometheus:
+    image: prom/prometheus:latest
+    volumes: ["./prometheus.yml:/etc/prometheus/prometheus.yml:ro","./rules:/etc/prometheus/rules:ro"]
+    ports: ["9090:9090"]
+  tempo:
+    image: grafana/tempo:latest
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes: ["./tempo.yaml:/etc/tempo.yaml:ro"]
+  loki:
+    image: grafana/loki:latest
+    command: ["-config.file=/etc/loki.yaml"]
+    volumes: ["./loki.yaml:/etc/loki.yaml:ro"]
+  grafana:
+    image: grafana/grafana:latest
+    environment: { GF_AUTH_ANONYMOUS_ENABLED: "true" }
+    volumes: ["./grafana-datasources.yaml:/etc/grafana/provisioning/datasources/ds.yaml:ro"]
+    ports: ["3000:3000"]
+    depends_on: [prometheus, tempo, loki]

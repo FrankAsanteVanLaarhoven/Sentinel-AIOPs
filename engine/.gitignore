@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+# generated demo outputs (regenerable via `make demo`)
+artifacts/
+CLAUDE.md

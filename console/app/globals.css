@@ -1,0 +1,215 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ *
+ * Sentinel Console — Palantir/Tesla "velvet" design tokens
+ * ------------------------------------------------------------------ */
+:root {
+  --void: #06070a;
+  --panel: #0b0e15;
+  --panel-2: #10141d;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-2: rgba(255, 255, 255, 0.13);
+
+  --pearl: #ebeef6;
+  --silver: #aeb6c6;
+  --mist: #79839a;
+  --dim: #4c566b;
+
+  --ice: #7fa6d9; /* restrained accent */
+
+  --ok: #5fd08a;
+  --warn: #e8b24c;
+  --crit: #ff6a4d;
+  --root: #ff6a4d;
+
+  /* font stacks — the next/font variables are injected on <html> */
+  --disp: var(--font-disp), "Sora", system-ui, sans-serif;
+  --body: var(--font-body), "Inter", system-ui, sans-serif;
+  --mono: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+
+  --grid:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+}
+
+/* Expose a few tokens to Tailwind's theme so utilities resolve cleanly */
+@theme inline {
+  --color-void: var(--void);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-pearl: var(--pearl);
+  --color-silver: var(--silver);
+  --color-mist: var(--mist);
+  --color-ice: var(--ice);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-crit: var(--crit);
+  --font-sans: var(--body);
+  --font-mono: var(--mono);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--void);
+  color: var(--pearl);
+  font-family: var(--body);
+  background-image: radial-gradient(
+    1200px 700px at 85% -12%,
+    rgba(60, 90, 150, 0.1),
+    transparent 60%
+  );
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Numeric readouts: tabular figures everywhere numbers live */
+.mono,
+.tnum {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Faint dotted "Foundry" grid inside chart panels */
+.panel-grid-bg {
+  background-image: var(--grid);
+  background-size: 22px 22px;
+  background-position: -1px -1px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Dashboard board grid (named areas). Stacks on small screens.
+ * ------------------------------------------------------------------ */
+.board {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 1180px) {
+  .board {
+    grid-template-columns: minmax(340px, 27%) 1fr;
+    align-items: start;
+  }
+}
+
+.board-panels {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(12, 1fr);
+  grid-auto-rows: minmax(0, auto);
+  grid-template-areas:
+    "s1 s1 s1 s2 s2 s2 s3 s3 s3 s4 s4 s4"
+    "gs gs gs gs gs gs gs gs topo topo topo topo"
+    "cr cr cr cr dn dn dn dn topo topo topo topo"
+    "hh hh hh hh hh hh hh hh sp sp sp sp"
+    "tw tw tw tw tw tw tw tw lh lh lh lh";
+}
+/* Tablet: two-up cards, panels stack more forgivingly */
+@media (max-width: 1179px) {
+  .board-panels {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-areas:
+      "s1 s2"
+      "s3 s4"
+      "gs gs"
+      "topo topo"
+      "cr dn"
+      "hh sp"
+      "tw lh";
+  }
+}
+@media (max-width: 720px) {
+  .board-panels {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "s1" "s2" "s3" "s4" "gs" "topo" "cr" "dn" "hh" "sp" "tw" "lh";
+  }
+}
+
+.area-s1 { grid-area: s1; }
+.area-s2 { grid-area: s2; }
+.area-s3 { grid-area: s3; }
+.area-s4 { grid-area: s4; }
+.area-gs { grid-area: gs; min-width: 0; }
+.area-topo { grid-area: topo; min-width: 0; }
+.area-cr { grid-area: cr; min-width: 0; }
+.area-dn { grid-area: dn; min-width: 0; }
+.area-hh { grid-area: hh; min-width: 0; }
+.area-sp { grid-area: sp; min-width: 0; }
+.area-tw { grid-area: tw; min-width: 0; }
+.area-lh { grid-area: lh; min-width: 0; }
+
+/* ------------------------------------------------------------------ *
+ * Skeletons (velvet shimmer) + status utilities
+ * ------------------------------------------------------------------ */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--panel-2);
+  border-radius: 6px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.05),
+    transparent
+  );
+  animation: shimmer 1.6s infinite;
+}
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  display: inline-block;
+  flex: none;
+}
+.dot-ok { background: var(--ok); box-shadow: 0 0 8px rgba(95, 208, 138, 0.5); }
+.dot-warn { background: var(--warn); box-shadow: 0 0 8px rgba(232, 178, 76, 0.5); }
+.dot-crit { background: var(--crit); box-shadow: 0 0 8px rgba(255, 106, 77, 0.55); }
+
+/* Subtle, precise scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+
+/* Visible focus for keyboard users */
+:focus-visible {
+  outline: 2px solid var(--ice);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Restrained motion; honour reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(255, 106, 77, 0.35); }
+  70% { box-shadow: 0 0 0 8px rgba(255, 106, 77, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 106, 77, 0); }
+}

@@ -1,0 +1,14 @@
+receivers:
+  otlp:
+    protocols: { http: {}, grpc: {} }
+processors:
+  batch: {}
+exporters:
+  prometheus: { endpoint: "0.0.0.0:8889" }        # metrics -> Prometheus scrape
+  otlp/tempo: { endpoint: "tempo:4317", tls: { insecure: true } }   # traces -> Tempo
+  loki: { endpoint: "http://loki:3100/loki/api/v1/push" }           # logs -> Loki
+service:
+  pipelines:
+    traces:  { receivers: [otlp], processors: [batch], exporters: [otlp/tempo] }
+    metrics: { receivers: [otlp], processors: [batch], exporters: [prometheus] }
+    logs:    { receivers: [otlp], processors: [batch], exporters: [loki] }

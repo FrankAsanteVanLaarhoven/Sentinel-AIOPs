@@ -1,0 +1,18 @@
+groups:
+  - name: sentinel-slo
+    rules:
+      # error ratio per service (RED)
+      - record: job:http_error_ratio:rate5m
+        expr: sum by (service_name) (rate(http_errors_total[5m]))
+              / sum by (service_name) (rate(http_requests_total[5m]))
+      # multi-window, multi-burn-rate alerts against a 99% availability SLO (1% budget)
+      - alert: SLOFastBurn
+        expr: job:http_error_ratio:rate5m > (14.4 * 0.01)
+        for: 2m
+        labels: { severity: page }
+        annotations: { summary: "Fast error-budget burn on {{ $labels.service_name }}" }
+      - alert: SLOSlowBurn
+        expr: job:http_error_ratio:rate5m > (6 * 0.01)
+        for: 15m
+        labels: { severity: ticket }
+        annotations: { summary: "Slow error-budget burn on {{ $labels.service_name }}" }
