@@ -3,6 +3,8 @@ install: ; pip install -r requirements.txt
 test:    ; pytest -q
 demo:    ; python demo/run_incident.py         # detect -> localize -> root cause report
 verify:  ; python scripts/verify.py            # all 5 scenarios vs documented ground-truth root
+install-ml:   ; pip install -r requirements-ml.txt          # extras for training the log detector
+train-logdet: ; python scripts/train_log_anomaly.py         # train+eval log-anomaly on real HDFS (SHARDS=n)
 serve:   ; uvicorn sentinel.api.engine_api:app --port 8008 --reload   # the incident engine HTTP API (:8008)
 run:     ; uvicorn sentinel.api.main:app --reload   # instrumented sample service
 incident:; FEATURE_FLAG_NEW_RANKING=1 uvicorn sentinel.api.main:app --port 8000  # reproduce the incident

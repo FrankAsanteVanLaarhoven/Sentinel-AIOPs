@@ -11,9 +11,11 @@ Run:  uvicorn sentinel.api.engine_api:app --port 8008
 """
 from __future__ import annotations
 
+import json
 import math
 import os
 import time
+from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, Query
@@ -380,6 +382,46 @@ The engine proposes; it does not act. No remediation is executed without a human
 _Produced by the Sentinel engine at runtime · scenario `{scenario}` · source {DATA_SOURCE}._
 """
     return {"scenario": scenario, "root": root, "markdown": md}
+
+
+_ART = Path(__file__).resolve().parents[3] / "artifacts"
+
+# The measured, documented envelope of the learned log-anomaly detector
+# (see docs/LOG_ANOMALY.md). Kept here so the metrics are always visible even
+# before anyone retrains; `source` says whether these are the documented figures
+# or a fresh reproduction from `make train-logdet` on this machine.
+_LOG_ANOMALY_CARD = {
+    "dataset": "logfit-project/HDFS_v1",
+    "model": "LogisticRegression(bag-of-events)",
+    "source": "documented",
+    "heldout_sessions": 32415,
+    "anomaly_rate": 0.0495,
+    "metrics": {"precision": 0.992, "recall": 0.564, "f1": 0.719, "roc_auc": 0.787},
+    "caveats": [
+        "Bag-of-events discards intra-session order; sequence models report higher F1.",
+        "High precision, modest recall — calibrate the threshold to your operating point.",
+    ],
+    "boundary": "Detection layer only — never touches localization or change ranking.",
+}
+
+
+@app.get("/log-anomaly")
+def api_log_anomaly():
+    """The learned detector's model card: real-HDFS held-out metrics + caveats +
+    the architectural boundary. Reflects a fresh `make train-logdet` run if its
+    artifact is present, otherwise the documented envelope."""
+    card = dict(_LOG_ANOMALY_CARD)
+    fresh = _ART / "log_anomaly_card.json"
+    if fresh.exists():
+        try:
+            data = json.loads(fresh.read_text())
+            card["metrics"] = data.get("metrics", card["metrics"])
+            card["heldout_sessions"] = data.get("sessions_heldout", card["heldout_sessions"])
+            card["anomaly_rate"] = data.get("anomaly_rate", card["anomaly_rate"])
+            card["source"] = f"reproduced ({data.get('shards_used', '?')} shard(s), this machine)"
+        except Exception:
+            pass
+    return card
 
 
 def _slice(range_key: str):

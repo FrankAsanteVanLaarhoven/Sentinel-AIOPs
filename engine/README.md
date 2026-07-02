@@ -26,10 +26,29 @@ OpenTelemetry (traces + RED metrics + logs) → OTel Collector → Prometheus (S
 Loki (logs) + Grafana (dashboards). Incident engine with MCP-style tools. An LLM agent narrates the
 investigation in production; the correlation logic is real and runs offline.
 
+## Detection may be learned; causal reasoning stays deterministic
+Sentinel draws a hard line. **Localization and change correlation are rule-based graph analysis** — inspectable
+and replayable, no model weights involved. **Only the detection layer may learn.** A logistic **log-anomaly
+detector** trained on the real, public [`logfit-project/HDFS_v1`](https://huggingface.co/datasets/logfit-project/HDFS_v1)
+corpus scores whether a log session is anomalous:
+
+| metric (held-out) | precision | recall | F1 | ROC-AUC |
+|---|---|---|---|---|
+| bag-of-events · logistic | **0.992** | **0.564** | **0.719** | **0.787** |
+
+_108,047 sessions (1 shard, 4.95% anomaly), 32,415 held-out._ High precision, modest recall — bag-of-events
+discards intra-session order (sequence models score higher on complete sessions). Reproduce and read the full
+model card:
+```bash
+make install-ml && make train-logdet   # SHARDS=5 for the full corpus
+```
+→ `docs/LOG_ANOMALY.md` · `GET /log-anomaly` returns the live card. The detector produces a scalar probability
+only; it never sees the topology, picks a root, or ranks changes.
+
 ## Quickstart
 ```bash
 make install
-make test      # 4 passed — detects, localizes, finds root cause, no false alarm pre-incident
+make test      # 9 passed — detect/localize/root-cause + the learned log detector (offline)
 make demo      # prints the incident report + metrics; writes artifacts/incident_report.md
 make stack     # full OTel + Grafana stack (Grafana :3000, Prometheus :9090)
 make incident  # run the sample service with the failure flag on, to see it live
