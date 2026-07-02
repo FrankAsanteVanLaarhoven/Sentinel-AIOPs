@@ -424,6 +424,42 @@ def api_log_anomaly():
     return card
 
 
+# Measured envelope of the localization validation harness (docs/RCA_VALIDATION.md).
+_RCA_VALIDATION_CARD = {
+    "dataset": "amazon-science/petshop-root-cause-analysis",
+    "rule": "causal_root — deterministic, reused verbatim, not tuned",
+    "source": "documented",
+    "incidents": 68,
+    "recall_at_1": 0.265,
+    "recall_at_3": 0.471,
+    "detection_coverage": 0.706,
+    "failure_modes": [
+        "~29% of incidents never cross z>=3 on the target metric — a detection-stage miss.",
+        "PetShop splits one service into several nodes; recall@3 (0.47) >> recall@1 (0.27) — the region is found more often than the exact node.",
+    ],
+    "boundary": "Empirical validation of the deterministic core — localization is unchanged.",
+}
+
+
+@app.get("/rca-validation")
+def api_rca_validation():
+    """Localization accuracy on the real PetShop RCA corpus (recall@1 / recall@3
+    of the deterministic causal rule), with disclosed failure modes. Reflects a
+    fresh `make validate-rca` run if its artifact is present."""
+    card = dict(_RCA_VALIDATION_CARD)
+    fresh = _ART / "rca_validation_card.json"
+    if fresh.exists():
+        try:
+            data = json.loads(fresh.read_text())
+            for k in ("incidents", "recall_at_1", "recall_at_3", "detection_coverage"):
+                if k in data:
+                    card[k] = data[k]
+            card["source"] = "reproduced (this machine)"
+        except Exception:
+            pass
+    return card
+
+
 def _slice(range_key: str):
     """Map a UI range to indices of the 60-minute window (only 60 min exist)."""
     if range_key == "10m":

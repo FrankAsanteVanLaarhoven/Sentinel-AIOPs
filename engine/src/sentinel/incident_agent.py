@@ -16,13 +16,22 @@ def detect(tools, burn=5.0):
         if hot: return t, hot
     return None, []
 
+def causal_root(elevated, deps):
+    """The causal rule, as a pure function: a service is the ROOT if it is
+    elevated and *none of its dependencies are also elevated* (so its dependents
+    merely inherited the failure). Pick the loudest such root, else the loudest
+    elevated service overall. Shared verbatim by localize() and the RCA
+    validation harness so the two never diverge."""
+    if not elevated:
+        return None
+    roots = [s for s in elevated if not any(d in elevated for d in deps.get(s, ()))]
+    return max(roots, key=lambda s: elevated[s]) if roots else max(elevated, key=elevated.get)
+
 def localize(tools, t, burn=5.0):
     """Causal localization: a service is ROOT if none of its dependencies are also elevated."""
     elevated = {s: float(tools.query_metric(s, "error_rate", t, t+1)[0])
                 for s in SERVICES if tools.query_metric(s, "error_rate", t, t+1)[0] > burn*SLO_ERR}
-    roots = [s for s in elevated if not any(d in elevated for d in DEPS[s])]
-    culprit = max(roots, key=lambda s: elevated[s]) if roots else max(elevated, key=elevated.get, default=None)
-    return culprit, elevated
+    return causal_root(elevated, DEPS), elevated
 
 def find_root_cause(tools, culprit, t):
     cand = [c for c in tools.list_changes(0, t) if c["service"] == culprit]

@@ -45,10 +45,25 @@ make install-ml && make train-logdet   # SHARDS=5 for the full corpus
 → `docs/LOG_ANOMALY.md` · `GET /log-anomaly` returns the live card. The detector produces a scalar probability
 only; it never sees the topology, picks a root, or ranks changes.
 
+## The deterministic localizer, validated on real incidents
+The causal rule isn't just asserted — it's scored against a real labelled RCA corpus, the public
+[PetShop dataset](https://github.com/amazon-science/petshop-root-cause-analysis). The **same**
+`causal_root` function that runs live is applied to 68 real incidents; recall@1 = the engine's single answer.
+
+| corpus | incidents | recall@1 | recall@3 |
+|---|---:|---:|---:|
+| PetShop (all) | 68 | **0.265** | **0.471** |
+
+Honest and untuned — PetShop is a hard benchmark, and the harness also documents *why* it misses (a ~29%
+detection gap; service-vs-node granularity, so recall@3 ≈ 2× recall@1). Reproduce with `make validate-rca`;
+`GET /rca-validation` serves the card; full method + failure modes in `docs/RCA_VALIDATION.md`. **No
+localization logic is modified or tuned to the benchmark** — only the "elevated" signal is re-expressed for
+PetShop's latency metric.
+
 ## Quickstart
 ```bash
 make install
-make test      # 9 passed — detect/localize/root-cause + the learned log detector (offline)
+make test      # 12 passed — detect/localize/root-cause + learned log detector + RCA harness (offline)
 make demo      # prints the incident report + metrics; writes artifacts/incident_report.md
 make stack     # full OTel + Grafana stack (Grafana :3000, Prometheus :9090)
 make incident  # run the sample service with the failure flag on, to see it live
