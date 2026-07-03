@@ -428,6 +428,44 @@ def api_log_anomaly():
     return _log_anomaly_card()
 
 
+# Second detection-layer model: metric-anomaly on the real SMD corpus
+# (docs/METRIC_ANOMALY.md). Documented full-corpus numbers; overlaid if retrained.
+_METRIC_ANOMALY_CARD = {
+    "dataset": "NetManAIOps SMD (Server Machine Dataset)",
+    "model": "PCA reconstruction-error (unsupervised)",
+    "source": "documented",
+    "test_points": 708420,
+    "anomaly_rate": 0.042,
+    "metrics": {"precision": 0.142, "recall": 0.403, "f1": 0.21, "f1_point_adjusted": 0.35},
+    "caveats": [
+        "Unsupervised: threshold set from the training error distribution, never from test labels.",
+        "SMD papers report point-adjusted F1 with a test-selected threshold (0.8-0.9); this honest train-only setting is far more conservative.",
+    ],
+    "boundary": "Detection layer only — standalone real-data capability; not wired into the causal engine.",
+}
+
+
+def _metric_anomaly_card():
+    card = dict(_METRIC_ANOMALY_CARD)
+    fresh = _ART / "metric_anomaly_card.json"
+    if fresh.exists():
+        try:
+            data = json.loads(fresh.read_text())
+            for k in ("metrics", "test_points", "anomaly_rate"):
+                if k in data:
+                    card[k] = data[k]
+            card["source"] = f"reproduced ({data.get('machines', '?')} machines, this machine)"
+        except Exception:
+            pass
+    return card
+
+
+@app.get("/metric-anomaly")
+def api_metric_anomaly():
+    """Learned metric-anomaly detector card: real-SMD held-out metrics + caveats."""
+    return _metric_anomaly_card()
+
+
 # Measured envelope of the localization validation harness (docs/RCA_VALIDATION.md).
 _RCA_VALIDATION_CARD = {
     "dataset": "amazon-science/petshop-root-cause-analysis",
@@ -469,6 +507,18 @@ def api_rca_validation():
     return _rca_validation_card()
 
 
+def _detector_entry(name: str, card: dict) -> dict:
+    """Normalise a detector card to a compact entry for the detection layer."""
+    return {
+        "name": name,
+        "dataset": card.get("dataset"),
+        "model": card.get("model"),
+        "source": card.get("source"),
+        "metrics": card.get("metrics"),
+        "note": (card.get("caveats") or [""])[0],
+    }
+
+
 @app.get("/validation")
 def api_validation():
     """One queryable view of the three-layer honesty story: the learned detection
@@ -485,7 +535,10 @@ def api_validation():
                 "title": "Detection",
                 "kind": "learned",
                 "subtitle": "logs & metrics — statistical models on real public data",
-                "card": _log_anomaly_card(),
+                "detectors": [
+                    _detector_entry("Logs · HDFS", _log_anomaly_card()),
+                    _detector_entry("Metrics · SMD", _metric_anomaly_card()),
+                ],
             },
             {
                 "id": "localization",

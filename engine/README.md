@@ -45,6 +45,17 @@ make install-ml && make train-logdet   # SHARDS=5 for the full corpus
 → `docs/LOG_ANOMALY.md` · `GET /log-anomaly` returns the live card. The detector produces a scalar probability
 only; it never sees the topology, picks a root, or ranks changes.
 
+A second detector covers the **metric** modality: a PCA reconstruction detector trained unsupervised on the real
+[Server Machine Dataset](https://github.com/NetManAIOps/OmniAnomaly) (SMD), 28 machines / 708k labelled points:
+
+| metric (held-out, train-only threshold) | precision | recall | F1 | F1 (point-adjusted) |
+|---|---|---|---|---|
+| PCA reconstruction-error | **0.142** | **0.403** | **0.210** | **0.350** |
+
+Deliberately conservative: SMD papers report point-adjusted F1 with a *test-selected* threshold (0.8–0.9); ours
+never touches test labels to set the cut. `make train-metricdet` · `docs/METRIC_ANOMALY.md` · `GET /metric-anomaly`.
+Both detectors are composed into `GET /validation` and the console's Validation panel.
+
 ## The deterministic localizer, validated on real incidents
 The causal rule isn't just asserted — it's scored against a real labelled RCA corpus, the public
 [PetShop dataset](https://github.com/amazon-science/petshop-root-cause-analysis). The **same**
@@ -63,7 +74,7 @@ PetShop's latency metric.
 ## Quickstart
 ```bash
 make install
-make test      # 12 passed — detect/localize/root-cause + learned log detector + RCA harness (offline)
+make test      # 16 passed — detect/localize/root-cause + two learned detectors + RCA harness (offline)
 make demo      # prints the incident report + metrics; writes artifacts/incident_report.md
 make stack     # full OTel + Grafana stack (Grafana :3000, Prometheus :9090)
 make incident  # run the sample service with the failure flag on, to see it live

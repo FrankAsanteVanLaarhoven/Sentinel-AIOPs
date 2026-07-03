@@ -67,6 +67,6 @@ export const engine = {
     get<{ scenario: string; root?: string; markdown: string }>(
       `/runbook?scenario=${enc(scenario)}`,
     ),
-  // Static across scenarios; cache for an hour.
-  validation: () => get<Validation>("/validation", 3600),
+  // Composed from committed cards; always reflect the engine (cheap, no cache).
+  validation: () => get<Validation>("/validation"),
 };

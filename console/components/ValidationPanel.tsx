@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type {
   Validation,
   ValidationLayer,
-  DetectionCard,
+  DetectorCard,
   LocalizationCard,
   ValidationCard,
 } from "@/lib/types";
@@ -64,22 +64,43 @@ function Modes({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-function Detection({ c }: { c: DetectionCard }) {
+function DetectorRow({ d }: { d: DetectorCard }) {
   const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+  const m = d.metrics;
+  return (
+    <div className="rounded-md border border-[var(--line)] px-2 py-1.5 flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="mono text-[10px] text-[var(--pearl)]">{d.name}</span>
+        <Source label={d.source} />
+      </div>
+      <div className="mono tnum text-[10px] text-[var(--silver)] flex flex-wrap gap-x-2.5 gap-y-0.5">
+        <span>P {pct(m.precision)}</span>
+        <span>R {pct(m.recall)}</span>
+        <span>F1 {m.f1.toFixed(3)}</span>
+        {m.roc_auc != null && <span className="text-[var(--mist)]">AUC {m.roc_auc.toFixed(3)}</span>}
+        {m.f1_point_adjusted != null && (
+          <span className="text-[var(--mist)]" title="point-adjusted F1 (SMD convention)">
+            PA-F1 {m.f1_point_adjusted.toFixed(2)}
+          </span>
+        )}
+      </div>
+      <div className="mono text-[8px] text-[var(--dim)] truncate" title={d.dataset}>
+        {d.model} · {d.dataset}
+      </div>
+    </div>
+  );
+}
+
+function Detection({ detectors }: { detectors: DetectorCard[] }) {
+  const notes = detectors.map((d) => d.note).filter((n): n is string => !!n);
   return (
     <>
-      <div className="grid grid-cols-4 gap-2">
-        <Stat label="precision" value={pct(c.metrics.precision)} />
-        <Stat label="recall" value={pct(c.metrics.recall)} />
-        <Stat label="F1" value={c.metrics.f1.toFixed(3)} />
-        <Stat label="ROC-AUC" value={c.metrics.roc_auc.toFixed(3)} />
+      <div className="flex flex-col gap-1.5">
+        {detectors.map((d) => (
+          <DetectorRow key={d.name} d={d} />
+        ))}
       </div>
-      <div className="mono text-[9px] text-[var(--dim)]">
-        {c.model} · {c.heldout_sessions.toLocaleString()} held-out ·{" "}
-        <span className="text-[var(--silver)]">{c.dataset}</span>
-      </div>
-      <Source label={c.source} />
-      <Modes title="caveats" items={c.caveats} />
+      {notes.length > 0 && <Modes title="caveats" items={notes} />}
     </>
   );
 }
@@ -132,7 +153,7 @@ function LayerCard({ layer }: { layer: ValidationLayer }) {
           </span>
         </div>
         <p className="mono text-[10px] leading-relaxed text-[var(--mist)]">{layer.subtitle}</p>
-        {layer.id === "detection" && <Detection c={layer.card as DetectionCard} />}
+        {layer.id === "detection" && <Detection detectors={layer.detectors ?? []} />}
         {layer.id === "localization" && <Localization c={layer.card as LocalizationCard} />}
         {layer.id === "validation" && <ValidationBody c={layer.card as ValidationCard} />}
       </div>
