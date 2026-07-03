@@ -54,8 +54,8 @@ Beyond parity with modern AI-RCA dashboards, three differentiators — shown, no
 1. **Causal service topology** — root pulses `crit`, symptoms `warn`; error edges animate.
 2. **Change-correlation ranking** — the true cause ranked #1 by the engine's score
    (service-match × onset-proximity), with the *naive recency rank* shown beside it.
-3. **Honest, human-gated investigation** — stepped timeline with method, confidence, and failure modes, and an
-   explicit **Approve / Dismiss** gate. It proposes; it never acts.
+3. **Transparent, human-gated investigation** — stepped timeline with method, confidence, and failure modes, and
+   an explicit **Approve / Dismiss** gate. It proposes; it never acts.
 
 ## Getting started
 ```bash
@@ -99,8 +99,11 @@ cd engine && DATA_SOURCE=prom PROM_URL=http://prometheus:9090 \
 ```
 
 ## Learn more
-- **[docs/MANUSCRIPT.md](docs/MANUSCRIPT.md)** — full technical report: hypotheses, methods, datasets & ground
-  truth, results, the failure/mitigation log, decisions, methodological guardrails, and future work.
+- **[docs/SENTINEL_PAPER.md](docs/SENTINEL_PAPER.md)** — research paper draft: motivation, analytical related
+  work + references, full metric definitions & metric→failure mapping, method, experiment setup, results,
+  research-process log, scoped claim boundary, slide outline, and a three-paper route.
+- **[docs/MANUSCRIPT.md](docs/MANUSCRIPT.md)** — engineering technical report: hypotheses, methods, datasets &
+  ground truth, results, the failure/mitigation log, decisions, methodological guardrails, and future work.
 - **[notebooks/Sentinel_AIOPs_Grandmaster.ipynb](notebooks/Sentinel_AIOPs_Grandmaster.ipynb)** — a runnable,
   Grandmaster-style walkthrough that reproduces the three-layer pipeline end to end.
 - `engine/README.md` · `console/README.md` — component detail.
