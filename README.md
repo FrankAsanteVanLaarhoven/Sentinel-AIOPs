@@ -1,6 +1,6 @@
 # Sentinel-AIOPs
 
-**An honest, measurable AIOps system** built around a strict separation between *learned detection* and
+**A measurable AIOps system** built around a strict separation between *learned detection* and
 *deterministic causal reasoning*. It detects an SLO breach, **causally localizes** it (root vs symptom), finds
 the root-cause change, and *proposes* a fix **behind a human gate** — and renders it all in a dense, real-time
 console. Every performance number comes from a real public dataset; trade-offs are **quantified, not hidden**.
