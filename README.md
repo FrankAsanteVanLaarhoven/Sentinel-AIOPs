@@ -41,7 +41,7 @@ running any pipeline.
 | Layer | Component | Dataset | Headline (held-out) |
 |---|---|---|---|
 | Detection (learned) | Log detector | HDFS | **F1 0.719** (P 0.992 · R 0.564 · AUC 0.787) |
-| Detection (learned) | Metric detector | SMD | **F1 0.210** / PA-F1 0.35 *(honest train-only threshold)* |
+| Detection (learned) | Metric detector | SMD | **F1 0.210** / PA-F1 0.35 *(conservative train-only threshold)* |
 | Localization (deterministic) | `causal_root` | synthetic | **5/5** ground-truth agreement |
 | Validation (empirical) | `causal_root` | PetShop | **recall@1 0.265** / recall@3 0.471 · coverage 0.706 (→ 0.971 within-domain) |
 
@@ -100,7 +100,7 @@ cd engine && DATA_SOURCE=prom PROM_URL=http://prometheus:9090 \
 
 ## Learn more
 - **[docs/MANUSCRIPT.md](docs/MANUSCRIPT.md)** — full technical report: hypotheses, methods, datasets & ground
-  truth, results, the failure/mitigation log, decisions, honesty rails, and future work.
+  truth, results, the failure/mitigation log, decisions, methodological guardrails, and future work.
 - **[notebooks/Sentinel_AIOPs_Grandmaster.ipynb](notebooks/Sentinel_AIOPs_Grandmaster.ipynb)** — a runnable,
   Grandmaster-style walkthrough that reproduces the three-layer pipeline end to end.
 - `engine/README.md` · `console/README.md` — component detail.
