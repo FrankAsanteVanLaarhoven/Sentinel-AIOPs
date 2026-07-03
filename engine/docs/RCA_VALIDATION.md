@@ -55,8 +55,38 @@ as informative as the hits.
 - **Dense co-elevation:** real AWS graphs light up many nodes at once, so
   "elevated with no elevated dependency" can admit several candidates.
 
+## Within-domain detection — closing the coverage gap (measured)
+The ~29 % detection gap above is a *detection-layer* limitation, so we attacked
+it **within domain**: instead of the incident's single target metric one-sided,
+score each node on **all of its own metrics, two-sided** (magnitude = largest
+|z| vs the no-issue baseline). Same `causal_root` rule, same z ≥ 3 threshold,
+fixed a priori — only the detection signal changes. Run both with
+`make validate-rca`.
+
+| detection signal | recall@1 | recall@3 | detection coverage | avg #elevated |
+|---|---:|---:|---:|---:|
+| target metric · 1-sided (default) | **0.265** | **0.471** | 0.706 | 4.4 |
+| target metric · 2-sided | 0.265 | 0.471 | 0.706 | 4.7 |
+| **all metrics · 2-sided (within-domain)** | 0.206 | 0.441 | **0.971** | 8.8 |
+
+**Findings, stated plainly.**
+- Two-sided on the *target* metric changes nothing — so the missing 29 % genuinely
+  do not move the target metric; the anomaly lives in a *different* metric.
+- The within-domain signal **closes almost the entire coverage gap
+  (0.706 → 0.971)** by catching availability drops and non-target-metric
+  anomalies on PetShop's own data.
+- But it **doubles the elevated set** (4.4 → 8.8 nodes) and **costs ~6 pts of
+  recall@1** (0.265 → 0.206): saturating the "elevated" set weakens the causal
+  rule's discriminative power. This is the **detection↔localization tension**,
+  now quantified rather than assumed.
+
+The conservative target-metric signal remains the default (localization-precision
+first); the within-domain signal is an explicit, measured alternative
+(`signal="within_domain"`). Neither modifies the causal rule.
+
 ## Boundary
 The harness reads the engine; it never rewrites it. Localization stays
-deterministic and replayable; only the elevated signal is adapted, and it is
-fixed a priori. This is empirical validation of the deterministic core — not a
-learned model fitted to a leaderboard.
+deterministic and replayable; only the detection signal is adapted, and both
+options are fixed a priori (not tuned to the benchmark). This is empirical
+validation of the deterministic core — not a learned model fitted to a
+leaderboard.

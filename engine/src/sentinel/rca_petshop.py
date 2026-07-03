@@ -68,6 +68,45 @@ def elevated_services(
     return out
 
 
+def within_domain_elevated(
+    normal: pd.DataFrame, abnormal: pd.DataFrame, z_thr: float = Z_DEFAULT
+) -> dict[str, float]:
+    """Within-domain detection signal: a service is elevated if **any** of its
+    own metrics departs from its no-issue baseline by >= z_thr in **either
+    direction** (magnitude = the largest such |z|).
+
+    This is broader than :func:`elevated_services`, which inspects only the
+    incident's single target metric one-sided. Broadening to the node's full
+    metric vector, two-sided, catches incidents that surface as availability
+    *drops* or in non-target metrics — closing most of PetShop's detection-
+    coverage gap. The cost is a larger elevated set (see docs/RCA_VALIDATION.md);
+    the causal rule itself is unchanged. Fixed a priori at the same z_thr used
+    everywhere else — not tuned to the benchmark.
+    """
+    out: dict[str, float] = {}
+    nodes = abnormal.columns.get_level_values(0).unique()
+    base_nodes = set(normal.columns.get_level_values(0))
+    for node in nodes:
+        base = normal.xs(node, axis=1, level=0) if node in base_nodes else None
+        abn = abnormal.xs(node, axis=1, level=0)
+        best = 0.0
+        for col in abn.columns:
+            a = pd.to_numeric(abn[col], errors="coerce").dropna()
+            b = (
+                pd.to_numeric(base[col], errors="coerce").dropna()
+                if (base is not None and col in base.columns)
+                else pd.Series(dtype=float)
+            )
+            if len(b) < 3 or len(a) < 1:
+                continue
+            bmean, bstd = float(b.mean()), float(b.std())
+            floor = max(bstd, 0.10 * abs(bmean), 1e-9)
+            best = max(best, abs((float(a.mean()) - bmean) / floor))
+        if best >= z_thr:
+            out[str(node)] = best
+    return out
+
+
 def rank_candidates(elevated: dict[str, float], deps: dict[str, list[str]]) -> list[str]:
     """Causal roots first (loudest first), then the remaining elevated services.
     ``rank[0]`` is exactly what ``causal_root`` picks, so recall@1 == the engine."""
@@ -102,8 +141,16 @@ class Eval:
         s["hit3"] += h3
 
 
-def evaluate_dir(dataset_dir: str, z_thr: float = Z_DEFAULT, splits=("train", "test")) -> Eval:
-    """Run the rule over every labelled incident under a PetShop dataset dir."""
+def evaluate_dir(
+    dataset_dir: str, z_thr: float = Z_DEFAULT, splits=("train", "test"), signal: str = "target"
+) -> Eval:
+    """Run the (unchanged) causal rule over every labelled incident.
+
+    ``signal="target"`` uses the incident's single target metric one-sided (the
+    conservative default). ``signal="within_domain"`` uses the broader
+    all-metrics two-sided detection signal, which raises coverage at the cost of
+    localization precision. The ranking rule is identical either way.
+    """
     ev = Eval()
     scenarios = [
         s for s in ("low_traffic", "high_traffic", "temporal_traffic1", "temporal_traffic2")
@@ -126,7 +173,10 @@ def evaluate_dir(dataset_dir: str, z_thr: float = Z_DEFAULT, splits=("train", "t
                 if truth is None:
                     continue
                 abnormal = pd.read_csv(os.path.join(idir, "metrics.csv"), header=[0, 1, 2], index_col=0)
-                metric, agg = target["target"]["metric"], target["target"]["agg"]
-                elevated = elevated_services(normal, abnormal, metric, agg, z_thr)
+                if signal == "within_domain":
+                    elevated = within_domain_elevated(normal, abnormal, z_thr)
+                else:
+                    metric, agg = target["target"]["metric"], target["target"]["agg"]
+                    elevated = elevated_services(normal, abnormal, metric, agg, z_thr)
                 ev.add(scenario, truth, rank_candidates(elevated, deps))
     return ev

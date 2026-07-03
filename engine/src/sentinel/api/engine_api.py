@@ -475,11 +475,17 @@ _RCA_VALIDATION_CARD = {
     "recall_at_1": 0.265,
     "recall_at_3": 0.471,
     "detection_coverage": 0.706,
+    "within_domain": {
+        "recall_at_1": 0.206,
+        "recall_at_3": 0.441,
+        "detection_coverage": 0.971,
+        "note": "All-metrics two-sided signal on PetShop's own data closes the coverage gap (0.706 -> 0.971); the larger elevated set trades ~6pt recall@1 — the detection<->localization tension, quantified.",
+    },
     "failure_modes": [
-        "~29% of incidents never cross z>=3 on the target metric — a detection-stage miss.",
+        "Target signal: ~29% of incidents never cross z>=3 on the target metric — a detection-stage miss. The within-domain signal closes most of it (coverage 0.971).",
         "PetShop splits one service into several nodes; recall@3 (0.47) >> recall@1 (0.27) — the region is found more often than the exact node.",
     ],
-    "boundary": "Empirical validation of the deterministic core — localization is unchanged.",
+    "boundary": "Empirical validation of the deterministic core — localization (causal_root) is unchanged; only the detection signal varies.",
 }
 
 
@@ -491,7 +497,7 @@ def _rca_validation_card():
     if fresh.exists():
         try:
             data = json.loads(fresh.read_text())
-            for k in ("incidents", "recall_at_1", "recall_at_3", "detection_coverage"):
+            for k in ("incidents", "recall_at_1", "recall_at_3", "detection_coverage", "within_domain"):
                 if k in data:
                     card[k] = data[k]
             card["source"] = "reproduced (this machine)"

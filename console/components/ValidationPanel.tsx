@@ -129,6 +129,20 @@ function ValidationBody({ c }: { c: ValidationCard }) {
       <div className="mono text-[9px] text-[var(--dim)]">
         {c.incidents} real incidents · <span className="text-[var(--silver)]">{c.dataset}</span>
       </div>
+      {c.within_domain && (
+        <div
+          className="mono text-[9px] text-[var(--mist)]"
+          title={c.within_domain.note}
+        >
+          within-domain coverage{" "}
+          <span className="text-[var(--dim)]">{c.detection_coverage.toFixed(3)}</span>
+          {" → "}
+          <span className="text-[var(--ok)]">{c.within_domain.detection_coverage.toFixed(3)}</span>
+          {"  (recall@1 "}
+          <span className="text-[var(--crit)]">{c.within_domain.recall_at_1.toFixed(3)}</span>
+          {")"}
+        </div>
+      )}
       <Source label={c.source} />
       <Modes title="failure modes" items={c.failure_modes} />
     </>

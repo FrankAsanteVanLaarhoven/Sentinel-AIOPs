@@ -173,6 +173,12 @@ export interface ValidationCard {
   recall_at_1: number;
   recall_at_3: number;
   detection_coverage: number;
+  within_domain?: {
+    recall_at_1: number;
+    recall_at_3: number;
+    detection_coverage: number;
+    note?: string;
+  };
   failure_modes: string[];
   boundary: string;
 }
