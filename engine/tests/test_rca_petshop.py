@@ -69,6 +69,19 @@ def test_within_domain_catches_non_target_metric():
     assert elevated_services(normal, abnormal, "latency", "Average", z_thr=3.0) == {}
 
 
+def test_within_domain_selective_requires_multivariate_evidence():
+    # A moves on ONE metric; B moves on TWO. Broad (>=1) flags both;
+    # selective (>=2) requires multivariate evidence, so it drops A and keeps B.
+    normal = _multi({("A", "latency"): 100, ("A", "availability"): 99,
+                     ("B", "latency"): 100, ("B", "availability"): 99})
+    abnormal = _multi({("A", "latency"): 100, ("A", "availability"): 50,   # 1 metric
+                       ("B", "latency"): 200, ("B", "availability"): 50})   # 2 metrics
+    broad = within_domain_elevated(normal, abnormal, z_thr=3.0, min_metrics=1)
+    selective = within_domain_elevated(normal, abnormal, z_thr=3.0, min_metrics=2)
+    assert "A" in broad and "B" in broad
+    assert "A" not in selective and "B" in selective
+
+
 def test_no_anomaly_yields_no_candidates():
     normal = _frame({"A": 100, "B": 100})
     abnormal = _frame({"A": 101, "B": 100})  # within noise -> nothing elevated

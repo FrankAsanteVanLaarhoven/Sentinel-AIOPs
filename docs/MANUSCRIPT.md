@@ -85,7 +85,7 @@ We framed the work as a sequence of falsifiable hypotheses.
 | **H2** | The *same* rule generalizes to real labelled incidents without modification. | **Partially supported** | PetShop recall@1 = 0.265, recall@3 = 0.471 over 68 real incidents. Works, modestly; failure modes documented. |
 | **H3** | A lightweight, interpretable model trained on real public logs supplies a useful learned detection signal. | **Supported** | HDFS log detector: F1 0.719, precision 0.992 on 32,415 held-out sessions. |
 | **H4** | Learned detection extends to the *metric* modality on real public data. | **Supported, weak** | SMD PCA detector: F1 0.210 (PA-F1 0.35) under an honest train-only threshold. |
-| **H5** | The learned/deterministic boundary can be enforced *and* made queryable with zero side-effects on the causal core. | **Supported** | `/validation` composes all three layers from committed cards; causal rule byte-identical; suite 17/17 green. |
+| **H5** | The learned/deterministic boundary can be enforced *and* made queryable with zero side-effects on the causal core. | **Supported** | `/validation` composes all three layers from committed cards; causal rule byte-identical; suite 18/18 green. |
 
 A recurring meta-hypothesis — **H0: honesty is compatible with a working
 product** — held throughout: at no point did we invent a number, tune to a test
@@ -330,7 +330,7 @@ cut, so even the point-adjusted F1 is far lower — and far more honest.
 | Detection (learned) | Metric detector | SMD | F1 **0.210** / PA-F1 0.35 |
 | Localization (deterministic) | causal_root | synthetic | **5/5** ground truth |
 | Validation (empirical) | causal_root | PetShop | recall@1 **0.265** / recall@3 **0.471** |
-| System | full suite | — | **17/17** green |
+| System | full suite | — | **18/18** green |
 
 ### 8.6 Within-domain detection — closing the coverage gap (measured)
 
@@ -340,22 +340,33 @@ it **within domain**: score each node on **all of its own metrics, two-sided**
 metric one-sided. Same `causal_root`, same z ≥ 3, fixed a priori — only the
 detection signal changes.
 
-| detection signal | recall@1 | recall@3 | coverage | avg #elevated |
-|---|---:|---:|---:|---:|
-| target metric · 1-sided (default) | **0.265** | **0.471** | 0.706 | 4.4 |
-| target metric · 2-sided | 0.265 | 0.471 | 0.706 | 4.7 |
-| **all metrics · 2-sided (within-domain)** | 0.206 | 0.441 | **0.971** | 8.8 |
+Numbers are **all (train+test) / held-out test split**:
 
-**The result is a quantified trade-off, not a free win.** Two-sided on the target
-metric changes nothing — so the missing 29 % genuinely never move the target
-metric; the anomaly is in a *different* metric. The within-domain signal
-**closes almost the entire coverage gap (0.706 → 0.971)** by reading each node's
-full metric vector (catching availability drops). But it **doubles the elevated
-set** and **costs ~6 pts of recall@1** (0.265 → 0.206): saturating the "elevated"
-set weakens the causal rule's discriminative power. This is the
-**detection ↔ localization tension**, now measured. The conservative
-target-metric signal stays the default; within-domain is an explicit, measured
-alternative (`signal="within_domain"`); the causal rule is untouched either way.
+| detection signal | recall@1 | recall@3 | coverage | avg #elev |
+|---|---:|---:|---:|---:|
+| target metric · 1-sided (default) | **0.265 / 0.271** | **0.471 / 0.458** | 0.706 / 0.708 | 4.4 |
+| within-domain broad (≥1 metric, 2-sided) | 0.206 / 0.208 | 0.441 / 0.438 | **0.971 / 0.958** | 8.8 |
+| within-domain selective (≥2 metrics, 2-sided) | 0.250 / 0.229 | 0.471 / 0.396 | 0.941 / 0.917 | 6.3 |
+
+**A quantified trade-off, not a free win — and honest about held-out behaviour.**
+Two-sided on the *target* metric changes nothing, so the missing 29 % never move
+the target metric; the anomaly is in a *different* metric. The **broad**
+within-domain signal closes almost the whole coverage gap (0.706 → 0.971) but
+doubles the elevated set and costs ~6 pts recall@1 (0.265 → 0.206) — saturating
+"elevated" weakens the causal rule. The **selective** signal requires
+*multivariate evidence* (≥2 metrics deviate — genuine incidents perturb
+correlated metrics; noise is usually single-metric) and **recovers recall@1 vs
+broad** (0.206 → 0.250) at coverage 0.941.
+
+But the combined-set recovery is propped up by the small train split: on the
+**held-out test split** the selective signal does *not* reach target recall@1
+(0.229 vs 0.271) and recall@3 even *dips* (0.458 → 0.396). **Honest verdict:**
+within-domain detection reliably closes the coverage gap, and multivariate
+selectivity reliably beats the naive broad signal on recall@1 — but *no*
+within-domain signal restores full localization precision on held-out data. The
+detection ↔ localization tension is real, mitigated but not eliminated. The
+conservative target signal stays the default; both within-domain signals are
+explicit, measured alternatives; the causal rule is untouched throughout.
 
 ---
 
@@ -474,12 +485,15 @@ git config.
 
 ## 15. Future work
 
-1. **Reduce the precision cost of within-domain detection.** §8.6 *closed* the
-   coverage gap (0.706 → 0.971) but cost ~6 pts of recall@1 by saturating the
-   elevated set. Open question: a *selective* within-domain signal (e.g.
-   per-node PCA reconstruction where dimensionality allows, or a magnitude that
-   down-weights ubiquitously-noisy metrics) that keeps coverage high *and*
-   preserves localization precision — measured against the same harness.
+1. **Fully restore localization precision under within-domain detection.** §8.6
+   closed the coverage gap and a *multivariate-evidence* (≥2-metric) selectivity
+   rule recovered part of the recall cost — but on held-out data it still does
+   not reach the target signal's precision (recall@1 0.229 vs 0.271; recall@3
+   dips). Open question: a signal that keeps coverage high *and* preserves
+   precision on held-out incidents — e.g. per-node PCA reconstruction where
+   dimensionality allows, magnitudes that down-weight ubiquitously-noisy metrics,
+   or a learned within-domain detector — evaluated on the held-out split, not the
+   combined set.
 2. **Sequence-aware log detection** (DeepLog / LogLLM-style) to lift recall on
    complete sessions.
 3. **Threshold calibration** for the metric detector (per-machine adaptive,
@@ -526,12 +540,12 @@ documentation.
 
 ## Appendix B — test suite
 
-17 hermetic tests (no network): incident-agent detect/localize/root-cause + no
+18 hermetic tests (no network): incident-agent detect/localize/root-cause + no
 false alarm pre-incident (4); log detector — templating, featurisation,
 fit/predict, save/load (5); RCA harness — graph parse, elevated signal, ranking
-locates the true root, no-anomaly → no candidates, within-domain signal catches a
-non-target metric (4); metric detector — fit detects an injected segment,
-point-adjust, unfitted-raises, save/load (4).
+locates the true root, no-anomaly → no candidates, within-domain catches a
+non-target metric, selective needs multivariate evidence (5); metric detector —
+fit detects an injected segment, point-adjust, unfitted-raises, save/load (4).
 
 ## Appendix C — endpoint reference
 

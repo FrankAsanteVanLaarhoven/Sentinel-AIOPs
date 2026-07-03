@@ -53,6 +53,9 @@ def main() -> int:
     full = evaluate_dir(ds, z_thr=z, splits=("train", "test"), signal="target")
     test = evaluate_dir(ds, z_thr=z, splits=("test",), signal="target")
     within = evaluate_dir(ds, z_thr=z, splits=("train", "test"), signal="within_domain")
+    within_t = evaluate_dir(ds, z_thr=z, splits=("test",), signal="within_domain")
+    selective = evaluate_dir(ds, z_thr=z, splits=("train", "test"), signal="within_domain_selective")
+    selective_t = evaluate_dir(ds, z_thr=z, splits=("test",), signal="within_domain_selective")
 
     print(f"{'scenario':20} {'n':>4} {'recall@1':>9} {'recall@3':>9}")
     print("-" * 46)
@@ -63,13 +66,16 @@ def main() -> int:
     print(f"{'test split only':20} {test.n:>4} {test.hit1 / test.n:>9.3f} {test.hit3 / test.n:>9.3f}")
     print(f"\ndetection coverage (some node flagged): {full.detected / full.n:.3f}")
 
-    def _line(name, ev):
-        return (f"  {name:30} recall@1={ev.hit1/ev.n:.3f}  recall@3={ev.hit3/ev.n:.3f}  "
-                f"coverage={ev.detected/ev.n:.3f}")
-    print("\nelevated-signal trade-off (same causal_root rule, only the detection signal changes):")
-    print(_line("target metric (default)", full))
-    print(_line("within-domain (all metrics)", within))
-    print("  -> within-domain closes the coverage gap; the larger elevated set costs localization precision.")
+    def _line(name, ev_all, ev_test):
+        return (f"  {name:30} r@1={ev_all.hit1/ev_all.n:.3f}/{ev_test.hit1/ev_test.n:.3f}  "
+                f"r@3={ev_all.hit3/ev_all.n:.3f}/{ev_test.hit3/ev_test.n:.3f}  "
+                f"cov={ev_all.detected/ev_all.n:.3f}/{ev_test.detected/ev_test.n:.3f}")
+    print("\nelevated-signal trade-off  (all / test-split; same causal_root rule, only the detection signal changes):")
+    print(_line("target metric (default)", full, test))
+    print(_line("within-domain broad (>=1)", within, within_t))
+    print(_line("within-domain selective (>=2)", selective, selective_t))
+    print("  -> both within-domain signals close the coverage gap. Multivariate selectivity (>=2 metrics)")
+    print("     mitigates the recall cost vs broad, but on held-out test does not fully restore precision.")
 
     card = {
         "dataset": "amazon-science/petshop-root-cause-analysis",
@@ -80,11 +86,20 @@ def main() -> int:
         "recall_at_3": round(full.hit3 / full.n, 3),
         "detection_coverage": round(full.detected / full.n, 3),
         "within_domain": {
-            "elevated_signal": "all metrics per node, two-sided |z| >= z_thr (within-domain detection)",
+            "elevated_signal": "all metrics per node, two-sided |z| >= z_thr, >=1 metric (broad)",
             "recall_at_1": round(within.hit1 / within.n, 3),
             "recall_at_3": round(within.hit3 / within.n, 3),
             "detection_coverage": round(within.detected / within.n, 3),
+            "test_recall_at_1": round(within_t.hit1 / within_t.n, 3),
             "note": "Closes the coverage gap on PetShop's own signals; the larger elevated set trades ~6pt recall@1 (detection<->localization tension).",
+        },
+        "within_domain_selective": {
+            "elevated_signal": "all metrics per node, two-sided |z| >= z_thr, >=2 metrics (multivariate evidence)",
+            "recall_at_1": round(selective.hit1 / selective.n, 3),
+            "recall_at_3": round(selective.hit3 / selective.n, 3),
+            "detection_coverage": round(selective.detected / selective.n, 3),
+            "test_recall_at_1": round(selective_t.hit1 / selective_t.n, 3),
+            "note": "Requires multivariate evidence to mitigate over-elevation. Recovers recall@1 vs broad, but on held-out test does not fully restore precision (recall@3 dips). The tension persists.",
         },
         "test_split": {
             "incidents": test.n,

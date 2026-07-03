@@ -69,19 +69,28 @@ def elevated_services(
 
 
 def within_domain_elevated(
-    normal: pd.DataFrame, abnormal: pd.DataFrame, z_thr: float = Z_DEFAULT
+    normal: pd.DataFrame,
+    abnormal: pd.DataFrame,
+    z_thr: float = Z_DEFAULT,
+    min_metrics: int = 1,
 ) -> dict[str, float]:
-    """Within-domain detection signal: a service is elevated if **any** of its
-    own metrics departs from its no-issue baseline by >= z_thr in **either
-    direction** (magnitude = the largest such |z|).
+    """Within-domain detection signal over a node's full metric vector.
 
-    This is broader than :func:`elevated_services`, which inspects only the
-    incident's single target metric one-sided. Broadening to the node's full
-    metric vector, two-sided, catches incidents that surface as availability
-    *drops* or in non-target metrics — closing most of PetShop's detection-
-    coverage gap. The cost is a larger elevated set (see docs/RCA_VALIDATION.md);
-    the causal rule itself is unchanged. Fixed a priori at the same z_thr used
-    everywhere else — not tuned to the benchmark.
+    Each of a node's metrics is z-scored (two-sided) against its no-issue
+    baseline. A node is elevated iff **at least ``min_metrics`` of its metrics**
+    deviate by >= z_thr; its magnitude is the largest such |z|.
+
+    - ``min_metrics=1`` ("broad") — any single metric moving is enough. Broader
+      than :func:`elevated_services` (single target metric, one-sided): it catches
+      availability *drops* and non-target-metric anomalies, closing most of
+      PetShop's coverage gap — but a single noisy metric can over-elevate.
+    - ``min_metrics=2`` ("selective") — requires **multivariate evidence**, since
+      genuine incidents perturb correlated metrics while noise is usually a single
+      one. This mitigates the recall cost of over-elevation (though on held-out
+      data it does not fully restore localization precision — see
+      docs/RCA_VALIDATION.md).
+
+    Fixed a priori at the same z_thr used elsewhere; the causal rule is unchanged.
     """
     out: dict[str, float] = {}
     nodes = abnormal.columns.get_level_values(0).unique()
@@ -89,7 +98,7 @@ def within_domain_elevated(
     for node in nodes:
         base = normal.xs(node, axis=1, level=0) if node in base_nodes else None
         abn = abnormal.xs(node, axis=1, level=0)
-        best = 0.0
+        zs: list[float] = []
         for col in abn.columns:
             a = pd.to_numeric(abn[col], errors="coerce").dropna()
             b = (
@@ -101,9 +110,10 @@ def within_domain_elevated(
                 continue
             bmean, bstd = float(b.mean()), float(b.std())
             floor = max(bstd, 0.10 * abs(bmean), 1e-9)
-            best = max(best, abs((float(a.mean()) - bmean) / floor))
-        if best >= z_thr:
-            out[str(node)] = best
+            zs.append(abs((float(a.mean()) - bmean) / floor))
+        zs.sort(reverse=True)
+        if len(zs) >= min_metrics and zs[min_metrics - 1] >= z_thr:
+            out[str(node)] = zs[0]
     return out
 
 
@@ -147,9 +157,10 @@ def evaluate_dir(
     """Run the (unchanged) causal rule over every labelled incident.
 
     ``signal="target"`` uses the incident's single target metric one-sided (the
-    conservative default). ``signal="within_domain"`` uses the broader
-    all-metrics two-sided detection signal, which raises coverage at the cost of
-    localization precision. The ranking rule is identical either way.
+    conservative default). ``signal="within_domain"`` uses the broad all-metrics
+    two-sided signal (raises coverage, costs precision). ``signal="within_domain_selective"``
+    requires multivariate evidence (>=2 metrics), mitigating the recall cost. The
+    ranking rule (``causal_root``) is identical for all three.
     """
     ev = Eval()
     scenarios = [
@@ -175,6 +186,8 @@ def evaluate_dir(
                 abnormal = pd.read_csv(os.path.join(idir, "metrics.csv"), header=[0, 1, 2], index_col=0)
                 if signal == "within_domain":
                     elevated = within_domain_elevated(normal, abnormal, z_thr)
+                elif signal == "within_domain_selective":
+                    elevated = within_domain_elevated(normal, abnormal, z_thr, min_metrics=2)
                 else:
                     metric, agg = target["target"]["metric"], target["target"]["agg"]
                     elevated = elevated_services(normal, abnormal, metric, agg, z_thr)

@@ -30,7 +30,7 @@ running any pipeline.
 
 | Component | Status |
 |---|---|
-| Deterministic causal core (`causal_root`) | Untouched & reproducible · suite **17/17** green |
+| Deterministic causal core (`causal_root`) | Untouched & reproducible · suite **18/18** green |
 | Detection layer | **2** learned detectors on real public datasets |
 | PetShop validation | recall@1 **0.265** / recall@3 **0.471**; within-domain **coverage 0.706 → 0.971** *(costs ~6 pts recall@1 — trade-off measured)* |
 | Three-layer query interface | Live (`GET /validation`) |
@@ -74,7 +74,7 @@ make verify          # 5/5 synthetic scenarios at 100% ground truth
 make train-logdet    # HDFS log detector   → P 0.992 / R 0.564 / F1 0.719 / AUC 0.787
 make train-metricdet # SMD metric detector → P 0.142 / R 0.403 / F1 0.210 / PA-F1 0.35
 make validate-rca    # PetShop localization + within-domain trade-off (target vs all-metrics signal)
-make test            # 17/17 hermetic tests (offline)
+make test            # 18/18 hermetic tests (offline)
 ```
 Corpora and trained weights are git-ignored and regenerated from source; the repo commits only the
 reproducible pipeline.
