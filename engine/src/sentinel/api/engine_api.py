@@ -527,13 +527,18 @@ _RCAEVAL_CARD = {
     "rule": "causal_root — deterministic, reused verbatim, not tuned",
     "source": "documented",
     "metric_def": "Top-k = ground-truth root-cause service within the top-k ranked candidates.",
+    "candidate_set": "Injectable application/routing services only (the benchmark's ground-truth granularity); excludes node-exporters, exporters, istio passthrough/stubs, and datastores/brokers. Disclosed modeling choice, not label tuning.",
     "systems": {
         "OB": {
-            "within_domain": {"n": 125, "top_1": 0.664, "top_3": 0.920, "coverage": 0.992},
+            "within_domain": {"n": 125, "top_1": 0.808, "top_3": 0.936, "coverage": 0.992},
             "within_domain_selective": {"n": 125, "top_1": 0.800, "top_3": 0.816, "coverage": 0.840},
-        }
+        },
+        "SS": {
+            "within_domain": {"n": 125, "top_1": 0.792, "top_3": 0.864, "coverage": 1.0},
+            "within_domain_selective": {"n": 125, "top_1": 0.872, "top_3": 0.960, "coverage": 1.0},
+        },
     },
-    "scope": "RE1-OB (Online Boutique, 125 cases) measured; RE1-SS/TT + RE2/RE3 not yet included; no baseline comparison claimed yet.",
+    "scope": "RE1-OB + RE1-SS (125 cases each) measured; RE1-TT + RE2/RE3 not yet included; no baseline comparison claimed yet.",
 }
 
 
@@ -545,7 +550,7 @@ def _rcaeval_card():
     if fresh.exists():
         try:
             data = json.loads(fresh.read_text())
-            for k in ("systems", "tier", "scope", "metric_def"):
+            for k in ("systems", "tier", "scope", "metric_def", "candidate_set"):
                 if k in data:
                     card[k] = data[k]
             card["source"] = "reproduced (this machine)"

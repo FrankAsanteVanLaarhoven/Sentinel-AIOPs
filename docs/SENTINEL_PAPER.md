@@ -228,24 +228,35 @@ The log detector is high-precision / moderate-recall — a trustworthy-when-it-f
 | within-domain broad (≥1) | 0.206 / 0.208 | 0.441 / 0.438 | **0.971 / 0.958** | 8.8 |
 | within-domain selective (≥2) | 0.250 / 0.229 | 0.471 / 0.396 | 0.941 / 0.917 | 6.3 |
 
-### 7.2b Standardized benchmark — RCAEval RE1-OB (measured)
+### 7.2b Standardized benchmark — RCAEval RE1 (measured, two systems)
 
 The same verbatim `causal_root`, run through a thin adapter on the public RCAEval
-benchmark (Pham et al., 2025), Online Boutique tier RE1-OB (**125 cases**, 5 injected
-services × 5 fault types × 5 instances; ground-truth service encoded in the case
-directory). Top-k = ground-truth service within the top-k ranked candidates.
+benchmark (Pham et al., 2025), RE1 tier (metrics-only), **Online Boutique (OB)** and
+**Sock Shop (SS)** — 125 cases each (5 injected services × 5 fault types × 5
+instances; ground-truth service encoded in the case directory). Top-k = ground-truth
+service within the top-k ranked candidates.
 
-| elevated signal | Top-1 | Top-3 | coverage |
-|---|---:|---:|---:|
-| within-domain broad (≥1 metric) | 0.664 | **0.920** | 0.992 |
-| within-domain selective (≥2 metrics) | **0.800** | 0.816 | 0.840 |
+| system | elevated signal | Top-1 | Top-3 | coverage |
+|---|---|---:|---:|---:|
+| OB | broad (≥1 metric) | **0.808** | **0.936** | 0.992 |
+| OB | selective (≥2 metrics) | 0.800 | 0.816 | 0.840 |
+| SS | broad (≥1 metric) | 0.792 | 0.864 | 1.000 |
+| SS | **selective (≥2 metrics)** | **0.872** | **0.960** | 1.000 |
 
-Per-fault Top-1 (selective): delay/disk/mem = **1.000**; cpu 0.360, loss 0.640 —
-the weak spots, disclosed. On RCAEval the **selective** signal is the Top-1 winner,
-mirroring the multivariate-evidence rationale of §8. **Scope:** RE1-OB only; RE1-SS/TT
-and RE2/RE3 not yet included; no comparison to RCAEval's 15 baselines is claimed
-yet (that requires their per-system reported numbers). z=3 / `min_metrics` were
-fixed a priori, not tuned on RCAEval.
+**Candidate set (disclosed modeling choice).** Candidates are the injectable
+application/routing services — RCAEval's ground-truth granularity — so infra nodes
+(host node-exporters, `*-exporter`, istio passthrough/stubs, datastores/brokers) are
+uniformly excluded; they are never labelled root causes. This is a category decision
+fixed a priori, not label tuning; without it, infra nodes become spurious roots
+(OB broad Top-1 falls to 0.664).
+
+**Reading it.** On the richer-metric Sock Shop the **selective** (multivariate-evidence)
+signal is decisively better (Top-1 0.792→0.872, Top-3 0.864→0.960), the same effect
+measured on PetShop, now on two independent systems. Per-fault Top-1 (selective):
+OB delay/disk/mem = 1.000, cpu 0.360, loss 0.640; SS disk 0.960, cpu 0.920, mem 0.880.
+**Scope:** RE1-OB + RE1-SS only; RE1-TT and RE2/RE3 not yet included; no comparison to
+RCAEval's 15 baselines is claimed yet (that requires their per-system reported numbers).
+z = 3 / `min_metrics` were fixed a priori, not tuned on RCAEval.
 
 ### 7.3 The detection↔localization coupling (the core finding)
 

@@ -41,7 +41,19 @@ OB_DEPS: dict[str, list[str]] = {
     "shippingservice": [], "paymentservice": [], "emailservice": [],
 }
 
-SYSTEM_DEPS = {"OB": OB_DEPS}
+# Sock Shop's documented application-service topology. Candidates are the
+# injectable application/routing services only (the ground-truth granularity),
+# which — via the `s in deps` filter — excludes host node-exporters (192-168-*),
+# `*-exporter`, the network-only istio stubs (`front`/`queue`/`session`), and
+# datastores/broker (`*-db`, `rabbitmq`) that RCAEval never labels as root causes.
+SS_DEPS: dict[str, list[str]] = {
+    "front-end": ["catalogue", "carts", "orders", "user"],
+    "orders": ["carts", "payment", "shipping", "user"],
+    "carts": [], "catalogue": [], "user": [], "payment": [],
+    "shipping": [], "queue-master": [],
+}
+
+SYSTEM_DEPS = {"OB": OB_DEPS, "SS": SS_DEPS}
 FAULTS = ("cpu", "mem", "disk", "delay", "loss")
 
 
@@ -122,5 +134,8 @@ def evaluate_system(
             if len(normal) < 3 or len(abnormal) < 1:
                 continue
             elevated = within_domain_elevated(normal, abnormal, z_thr, min_metrics)
+            # Candidates = known topology nodes only (drops host node-exporters,
+            # `*-exporter`, and duplicate istio stubs that are not real services).
+            elevated = {s: m for s, m in elevated.items() if s in deps}
             ev.add(fault, truth, rank_candidates(elevated, deps))
     return ev

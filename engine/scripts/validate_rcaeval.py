@@ -31,7 +31,7 @@ ZENODO = "https://zenodo.org/api/records/14590730/files/{name}.zip/content"
 ART = Path(__file__).resolve().parents[1] / "artifacts"
 CACHE = ART / "rcaeval"
 # RE1 (metrics-only) systems we have topology graphs for.
-SYSTEMS = {"OB": "RE1-OB"}
+SYSTEMS = {"OB": "RE1-OB", "SS": "RE1-SS"}
 
 
 def ensure(system_code: str, archive: str) -> str:
@@ -55,8 +55,9 @@ def main() -> int:
         "rule": "causal_root — deterministic, reused verbatim, not tuned",
         "metric_def": "Top-k = ground-truth root-cause service is within the top-k ranked candidates; coverage = fraction of cases with any candidate.",
         "signal_note": "within-domain elevated signal (z>=3), same as PetShop, fixed a priori.",
+        "candidate_set": "Candidates = the injectable application/routing services (the benchmark's ground-truth granularity), per each system's static topology. This uniformly excludes host node-exporters, `*-exporter`, istio passthrough/external endpoints, network-only istio stubs, and datastores/brokers (redis, `*-db`, rabbitmq) — none of which RCAEval labels as a root cause. A modeling choice, disclosed; not label tuning.",
         "systems": {},
-        "scope": "Online Boutique (RE1-OB, 125 cases) measured; Sock Shop / Train Ticket (RE1-SS/TT) and RE2/RE3 not yet included; no baseline comparison claimed yet.",
+        "scope": "Online Boutique (RE1-OB) + Sock Shop (RE1-SS), 125 cases each, measured. Train Ticket (RE1-TT) and RE2/RE3 not yet included; no baseline comparison claimed yet.",
     }
     for code, archive in SYSTEMS.items():
         if code not in SYSTEM_DEPS:
