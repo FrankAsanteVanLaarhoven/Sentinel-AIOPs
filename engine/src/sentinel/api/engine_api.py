@@ -528,22 +528,23 @@ _RCAEVAL_CARD = {
     "source": "documented",
     "metric_def": "Top-k = ground-truth root-cause service within the top-k ranked candidates.",
     "candidate_set": "Injectable application/routing services only (the benchmark's ground-truth granularity); excludes node-exporters, exporters, istio passthrough/stubs, and datastores/brokers. Disclosed modeling choice, not label tuning.",
+    "metric_names": "top_1/top_3 == AC@1/AC@3; avg_5 == Avg@5 = mean(AC@1..AC@5), RCAEval's headline metric.",
     "systems": {
         "OB": {
-            "within_domain": {"n": 125, "top_1": 0.808, "top_3": 0.936, "coverage": 0.992},
-            "within_domain_selective": {"n": 125, "top_1": 0.800, "top_3": 0.816, "coverage": 0.840},
+            "within_domain": {"n": 125, "top_1": 0.808, "top_3": 0.936, "avg_5": 0.910, "coverage": 0.992},
+            "within_domain_selective": {"n": 125, "top_1": 0.800, "top_3": 0.816, "avg_5": 0.811, "coverage": 0.840},
         },
         "SS": {
-            "within_domain": {"n": 125, "top_1": 0.792, "top_3": 0.864, "coverage": 1.0},
-            "within_domain_selective": {"n": 125, "top_1": 0.872, "top_3": 0.960, "coverage": 1.0},
+            "within_domain": {"n": 125, "top_1": 0.792, "top_3": 0.864, "avg_5": 0.878, "coverage": 1.0},
+            "within_domain_selective": {"n": 125, "top_1": 0.872, "top_3": 0.960, "avg_5": 0.947, "coverage": 1.0},
         },
         "TT": {
             "graph": "graph-free (no verified RE1 call graph); causal_root reduces to loudest multivariate-anomalous app service",
-            "within_domain": {"n": 125, "top_1": 0.664, "top_3": 0.904, "coverage": 1.0},
-            "within_domain_selective": {"n": 125, "top_1": 0.864, "top_3": 0.960, "coverage": 0.992},
+            "within_domain": {"n": 125, "top_1": 0.664, "top_3": 0.904, "avg_5": 0.866, "coverage": 1.0},
+            "within_domain_selective": {"n": 125, "top_1": 0.864, "top_3": 0.960, "avg_5": 0.942, "coverage": 0.992},
         },
     },
-    "aggregate_selective": {"cases": 375, "top_1": 0.845, "top_3": 0.912},
+    "aggregate_selective": {"cases": 375, "top_1": 0.845, "top_3": 0.912, "avg_5": 0.900},
     "scope": "Full RE1 (OB+SS+TT, 375 cases) measured; OB/SS use the topology graph, TT is graph-free. RE2/RE3 not yet included; no baseline comparison claimed yet.",
 }
 

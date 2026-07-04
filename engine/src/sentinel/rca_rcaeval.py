@@ -111,19 +111,30 @@ class BenchEval:
     top1: int = 0
     top3: int = 0
     detected: int = 0
+    hits: dict = field(default_factory=lambda: {k: 0 for k in range(1, 6)})
     per_fault: dict = field(default_factory=dict)
 
     def add(self, fault: str, truth: str, ranked: list[str]):
         self.n += 1
-        h1 = bool(ranked[:1]) and ranked[0] == truth
-        h3 = truth in ranked[:3]
         self.detected += len(ranked) > 0
+        for k in range(1, 6):  # AC@k = ground truth within the top-k candidates
+            if truth in ranked[:k]:
+                self.hits[k] += 1
+        h1 = ranked[:1] == [truth]
+        h3 = truth in ranked[:3]
         self.top1 += h1
         self.top3 += h3
         f = self.per_fault.setdefault(fault, {"n": 0, "top1": 0, "top3": 0})
         f["n"] += 1
         f["top1"] += h1
         f["top3"] += h3
+
+    def ac(self, k: int) -> float:  # AC@k
+        return self.hits[k] / self.n if self.n else 0.0
+
+    @property
+    def avg5(self) -> float:  # Avg@5 = mean(AC@1..AC@5), RCAEval's headline metric
+        return sum(self.hits[k] for k in range(1, 6)) / (5 * self.n) if self.n else 0.0
 
 
 def evaluate_system(

@@ -44,7 +44,7 @@ running any pipeline.
 | Detection (learned) | Metric detector | SMD | **F1 0.210** / PA-F1 0.35 *(conservative train-only threshold)* |
 | Localization (deterministic) | `causal_root` | synthetic | **5/5** ground-truth agreement |
 | Validation (empirical) | `causal_root` | PetShop | **recall@1 0.265** / recall@3 0.471 · coverage 0.706 (→ 0.971 within-domain) |
-| Benchmark (standardized) | `causal_root` | RCAEval RE1 (OB+SS+TT) | selective **Top-1 0.845** / **Top-3 0.912** across **375 cases** (OB 0.800 · SS 0.872 · TT 0.864) *(RE2/RE3 next)* |
+| Benchmark (standardized) | `causal_root` | RCAEval RE1 (OB+SS+TT) | selective **AC@1 0.845** / AC@3 0.912 / **Avg@5 0.900** across **375 cases** (AC@1: OB 0.800 · SS 0.872 · TT 0.864) *(baseline comparison + RE2/RE3 next)* |
 
 No invented numbers; no cross-domain transfer is claimed (the detectors are standalone real-data capabilities).
 The within-domain result closes the coverage gap **but** costs localization precision — reported as a

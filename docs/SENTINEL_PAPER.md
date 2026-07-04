@@ -236,15 +236,18 @@ benchmark (Pham et al., 2025), RE1 tier (metrics-only), across all three systems
 (**375 total**; 5 injected services × 5 fault types × 5 instances; ground-truth service
 encoded in the case directory). Top-k = ground-truth service within the top-k candidates.
 
-| system | graph | signal | Top-1 | Top-3 | coverage |
-|---|---|---|---:|---:|---:|
-| OB | topology | broad (≥1) | **0.808** | 0.936 | 0.992 |
-| OB | topology | selective (≥2) | 0.800 | 0.816 | 0.840 |
-| SS | topology | broad (≥1) | 0.792 | 0.864 | 1.000 |
-| SS | topology | **selective (≥2)** | **0.872** | **0.960** | 1.000 |
-| TT | graph-free | broad (≥1) | 0.664 | 0.904 | 1.000 |
-| TT | graph-free | **selective (≥2)** | **0.864** | **0.960** | 0.992 |
-| **aggregate** | | **selective** | **0.845** | **0.912** | — |
+We report RCAEval's own metrics: **AC@k** (ground truth within top-k — so our
+Top-1/Top-3 *are* AC@1/AC@3) and **Avg@5** = mean(AC@1…AC@5), RCAEval's headline number.
+
+| system | graph | signal | AC@1 | AC@3 | Avg@5 | coverage |
+|---|---|---|---:|---:|---:|---:|
+| OB | topology | broad (≥1) | **0.808** | 0.936 | **0.910** | 0.992 |
+| OB | topology | selective (≥2) | 0.800 | 0.816 | 0.811 | 0.840 |
+| SS | topology | broad (≥1) | 0.792 | 0.864 | 0.878 | 1.000 |
+| SS | topology | **selective (≥2)** | **0.872** | **0.960** | **0.947** | 1.000 |
+| TT | graph-free | broad (≥1) | 0.664 | 0.904 | 0.866 | 1.000 |
+| TT | graph-free | **selective (≥2)** | **0.864** | **0.960** | **0.942** | 0.992 |
+| **aggregate** | | **selective** | **0.845** | **0.912** | **0.900** | — |
 
 **Candidate set (disclosed modeling choice).** Candidates are the injectable
 application/routing services — RCAEval's ground-truth granularity — so infra nodes
@@ -263,9 +266,17 @@ signal gives Top-1 0.800 / 0.872 / 0.864 (aggregate **0.845**; Top-3 **0.912**) 
 effect first measured on PetShop, now consistent at scale. Broad over-elevates on the
 richer-metric systems, so selective is decisively better there (SS 0.792→0.872). Per-fault
 Top-1 (selective): OB delay/disk/mem 1.000, cpu 0.360, loss 0.640; TT cpu/mem 1.000, loss
-0.640. **Scope:** full RE1 only; RE2/RE3 not yet included; no comparison to RCAEval's 15
-baselines is claimed yet (that requires their per-system reported numbers). z = 3 /
-`min_metrics` were fixed a priori, not tuned on RCAEval.
+0.640. **Scope:** full RE1 only; RE2/RE3 not yet included. z = 3 / `min_metrics` were
+fixed a priori, not tuned on RCAEval.
+
+**Baseline context (no superiority claimed yet).** RCAEval implements 15 baselines (BARO,
+RCD, CIRCA, ε-Diagnosis, RUN, CausalRCA, MicroCause, TraceRCA, MicroRank, PDiagnose, …).
+We do **not** yet assert we beat them: a fair comparison must reproduce those baselines
+under the *same* candidate set and splits, which is the immediate next step. As a
+difficulty anchor only — *not* a comparison — prior work on the *harder* RE2 tier reports
+Avg@5 ≈ 0.46 (CIRCA) / 0.54 (RCD) / ~0.74–0.80 (BARO) on Train Ticket, and BARO's AC@1 on
+RE2-Online-Boutique is 0.144 (Avg@5 0.742), indicating exact top-1 is hard on these
+benchmarks. Those are RE2 numbers and are **not** comparable to our RE1 results.
 
 ### 7.3 The detection↔localization coupling (the core finding)
 

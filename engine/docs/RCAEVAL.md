@@ -31,20 +31,26 @@ Reproduce: `make install-ml && make validate-rcaeval`.
   `*-db`, `rabbitmq`) — none of which is ever a labelled root cause. This is a
   category decision fixed a priori, **not** label tuning; it applies identically
   to every system.
-- **Metric:** **Top-k** = the ground-truth service is within the top-k ranked
-  candidates; **coverage** = fraction of cases with any candidate.
+- **Metric:** we report RCAEval's own metrics. **AC@k** = the ground-truth service
+  is within the top-k ranked candidates (so our **Top-1/Top-3 are exactly AC@1/AC@3**);
+  **Avg@5** = mean(AC@1…AC@5), RCAEval's headline number; **coverage** = fraction of
+  cases with any candidate.
 
 ## Result — full RE1 (OB + SS + TT, 125 cases each = 375), measured
 
-| system | graph | elevated signal | Top-1 | Top-3 | coverage |
-|---|---|---|---:|---:|---:|
-| Online Boutique (OB) | topology | broad (≥1) | **0.808** | 0.936 | 0.992 |
-| | | selective (≥2) | 0.800 | 0.816 | 0.840 |
-| Sock Shop (SS) | topology | broad (≥1) | 0.792 | 0.864 | 1.000 |
-| | | **selective (≥2)** | **0.872** | **0.960** | 1.000 |
-| Train Ticket (TT) | graph-free | broad (≥1) | 0.664 | 0.904 | 1.000 |
-| | | **selective (≥2)** | **0.864** | **0.960** | 0.992 |
-| **aggregate (375)** | | **selective** | **0.845** | **0.912** | — |
+| system | graph | elevated signal | AC@1 | AC@3 | Avg@5 | coverage |
+|---|---|---|---:|---:|---:|---:|
+| Online Boutique (OB) | topology | broad (≥1) | **0.808** | 0.936 | **0.910** | 0.992 |
+| | | selective (≥2) | 0.800 | 0.816 | 0.811 | 0.840 |
+| Sock Shop (SS) | topology | broad (≥1) | 0.792 | 0.864 | 0.878 | 1.000 |
+| | | **selective (≥2)** | **0.872** | **0.960** | **0.947** | 1.000 |
+| Train Ticket (TT) | graph-free | broad (≥1) | 0.664 | 0.904 | 0.866 | 1.000 |
+| | | **selective (≥2)** | **0.864** | **0.960** | **0.942** | 0.992 |
+| **aggregate (375)** | | **selective** | **0.845** | **0.912** | **0.900** | — |
+
+The coverage/precision trade-off appears in Avg@5 too: on OB the higher-coverage
+**broad** signal has the better Avg@5 (0.910 vs 0.811), while on the richer-metric
+SS/TT the **selective** signal wins on every metric.
 
 **Per-fault Top-1 (selective).** OB: delay/disk/mem = 1.000, cpu 0.360, loss 0.640.
 SS: disk 0.960, cpu 0.920, mem 0.880, delay/loss 0.800. TT: cpu/mem 1.000, disk 0.920,

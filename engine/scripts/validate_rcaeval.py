@@ -64,15 +64,17 @@ def main() -> int:
             continue
         sysdir = ensure(code, archive)
         print(f"=== {archive} ({code}) ===")
-        print(f"{'signal':26}{'n':>5}{'Top-1':>8}{'Top-3':>8}{'cov':>8}")
+        print(f"{'signal':26}{'n':>5}{'AC@1':>7}{'AC@3':>7}{'AC@5':>7}{'Avg@5':>7}{'cov':>7}")
         sys_card = {}
         for sig in ("within_domain", "within_domain_selective"):
             e = evaluate_system(sysdir, system=code, signal=sig)
-            print(f"{sig:26}{e.n:>5}{e.top1/e.n:>8.3f}{e.top3/e.n:>8.3f}{e.detected/e.n:>8.3f}")
+            print(f"{sig:26}{e.n:>5}{e.ac(1):>7.3f}{e.ac(3):>7.3f}{e.ac(5):>7.3f}{e.avg5:>7.3f}{e.detected/e.n:>7.3f}")
             sys_card[sig] = {
                 "n": e.n,
-                "top_1": round(e.top1 / e.n, 3),
-                "top_3": round(e.top3 / e.n, 3),
+                "top_1": round(e.ac(1), 3),  # AC@1
+                "top_3": round(e.ac(3), 3),  # AC@3
+                "ac_5": round(e.ac(5), 3),
+                "avg_5": round(e.avg5, 3),  # RCAEval headline metric
                 "coverage": round(e.detected / e.n, 3),
                 "per_fault_top_1": {f: round(d["top1"] / d["n"], 3) for f, d in sorted(e.per_fault.items())},
             }
@@ -85,6 +87,7 @@ def main() -> int:
             "cases": tot,
             "top_1": round(sum(x["top_1"] * x["n"] for x in sel) / tot, 3),
             "top_3": round(sum(x["top_3"] * x["n"] for x in sel) / tot, 3),
+            "avg_5": round(sum(x["avg_5"] * x["n"] for x in sel) / tot, 3),
         }
     (ART / "rcaeval_card.json").write_text(json.dumps(card, indent=2))
     print("card -> artifacts/rcaeval_card.json")
