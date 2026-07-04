@@ -104,6 +104,8 @@ cd engine && DATA_SOURCE=prom PROM_URL=http://prometheus:9090 \
   research-process log, scoped claim boundary, slide outline, and a three-paper route.
 - **[docs/MANUSCRIPT.md](docs/MANUSCRIPT.md)** — engineering technical report: hypotheses, methods, datasets &
   ground truth, results, the failure/mitigation log, decisions, methodological guardrails, and future work.
+- **[docs/SLIDES.md](docs/SLIDES.md)** — presentation deck (Marp). Render with
+  `npx @marp-team/marp-cli docs/SLIDES.md -o slides.pdf` (or `--pptx` / `--html`).
 - **[notebooks/Sentinel_AIOPs_Grandmaster.ipynb](notebooks/Sentinel_AIOPs_Grandmaster.ipynb)** — a runnable,
   Grandmaster-style walkthrough that reproduces the three-layer pipeline end to end.
 - `engine/README.md` · `console/README.md` — component detail.
