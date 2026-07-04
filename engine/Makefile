@@ -7,6 +7,7 @@ install-ml:   ; pip install -r requirements-ml.txt          # extras for the log
 train-logdet:    ; python scripts/train_log_anomaly.py      # train+eval log-anomaly on real HDFS (SHARDS=n)
 train-metricdet: ; python scripts/train_metric_anomaly.py   # train+eval metric-anomaly on real SMD (MACHINES=…)
 validate-rca:    ; python scripts/validate_localization.py  # score causal localization on the real PetShop corpus
+validate-rcaeval:; python scripts/validate_rcaeval.py       # score causal localization on the RCAEval benchmark (RE1-OB)
 serve:   ; uvicorn sentinel.api.engine_api:app --port 8008 --reload   # the incident engine HTTP API (:8008)
 run:     ; uvicorn sentinel.api.main:app --reload   # instrumented sample service
 incident:; FEATURE_FLAG_NEW_RANKING=1 uvicorn sentinel.api.main:app --port 8000  # reproduce the incident

@@ -521,6 +521,46 @@ def api_rca_validation():
     return _rca_validation_card()
 
 
+_RCAEVAL_CARD = {
+    "benchmark": "RCAEval (Pham et al., TheWebConf 2025; DOI 10.1145/3701716.3715290)",
+    "tier": "RE1 (metrics-only)",
+    "rule": "causal_root — deterministic, reused verbatim, not tuned",
+    "source": "documented",
+    "metric_def": "Top-k = ground-truth root-cause service within the top-k ranked candidates.",
+    "systems": {
+        "OB": {
+            "within_domain": {"n": 125, "top_1": 0.664, "top_3": 0.920, "coverage": 0.992},
+            "within_domain_selective": {"n": 125, "top_1": 0.800, "top_3": 0.816, "coverage": 0.840},
+        }
+    },
+    "scope": "RE1-OB (Online Boutique, 125 cases) measured; RE1-SS/TT + RE2/RE3 not yet included; no baseline comparison claimed yet.",
+}
+
+
+def _rcaeval_card():
+    """Documented RCAEval RE1-OB result, overlaid with a fresh
+    `make validate-rcaeval` run if its artifact is present."""
+    card = dict(_RCAEVAL_CARD)
+    fresh = _ART / "rcaeval_card.json"
+    if fresh.exists():
+        try:
+            data = json.loads(fresh.read_text())
+            for k in ("systems", "tier", "scope", "metric_def"):
+                if k in data:
+                    card[k] = data[k]
+            card["source"] = "reproduced (this machine)"
+        except Exception:
+            pass
+    return card
+
+
+@app.get("/rcaeval")
+def api_rcaeval():
+    """Deterministic localization accuracy on the public RCAEval benchmark
+    (Top-1 / Top-3 of causal_root on RE1-OB), scope-bounded."""
+    return _rcaeval_card()
+
+
 def _detector_entry(name: str, card: dict) -> dict:
     """Normalise a detector card to a compact entry for the detection layer."""
     return {

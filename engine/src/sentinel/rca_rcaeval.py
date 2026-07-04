@@ -1,0 +1,126 @@
+"""Validate the deterministic causal-localization rule against the public
+**RCAEval** benchmark (Pham et al., TheWebConf 2025; DOI 10.1145/3701716.3715290) —
+a standardized microservice RCA corpus of 735 failure cases across three systems
+(Online Boutique, Sock Shop, Train Ticket) and three difficulty tiers (RE1/RE2/RE3).
+
+We reuse Sentinel's own signal and rule **verbatim**:
+- the within-domain "elevated" signal (:func:`sentinel.rca_petshop.within_domain_elevated`),
+- the causal graph rule (:func:`sentinel.incident_agent.causal_root`, via
+  :func:`sentinel.rca_petshop.rank_candidates`).
+
+Only the *adapter* is new: RCAEval RE1 ships one ``data.csv`` per case (columns
+``time`` + ``{service}_{metric}``) plus ``inject_time.txt``. The pre-injection
+window is the baseline; the post-injection window is the incident. The
+ground-truth root-cause service is encoded in the case directory name
+(``{service}_{fault}``). No localization logic is modified or tuned.
+"""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+
+import pandas as pd
+
+from .rca_petshop import Z_DEFAULT, rank_candidates, within_domain_elevated
+
+# --- Static service dependency graphs (caller -> callees). ---------------------
+# Online Boutique's canonical gRPC call graph. `main` is the ingress/load path.
+OB_DEPS: dict[str, list[str]] = {
+    "main": ["frontend"],
+    "frontend": [
+        "adservice", "cartservice", "checkoutservice", "currencyservice",
+        "productcatalogservice", "recommendationservice", "shippingservice",
+    ],
+    "checkoutservice": [
+        "cartservice", "currencyservice", "productcatalogservice",
+        "shippingservice", "paymentservice", "emailservice",
+    ],
+    "recommendationservice": ["productcatalogservice"],
+    "cartservice": [],
+    "adservice": [], "currencyservice": [], "productcatalogservice": [],
+    "shippingservice": [], "paymentservice": [], "emailservice": [],
+}
+
+SYSTEM_DEPS = {"OB": OB_DEPS}
+FAULTS = ("cpu", "mem", "disk", "delay", "loss")
+
+
+def load_case(data_csv: str, inject_time: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Split one RE1 ``data.csv`` into (normal, abnormal) MultiIndex frames.
+
+    Columns become ``(service, metric, "value")`` so the frames are drop-in
+    compatible with :func:`within_domain_elevated`. Rows with ``time <
+    inject_time`` are the pre-injection baseline; the rest are the incident.
+    """
+    df = pd.read_csv(data_csv)
+    time_col = "time" if "time" in df.columns else df.columns[0]
+    t = pd.to_numeric(df[time_col], errors="coerce")
+    tuples, keep = [], []
+    for c in df.columns:
+        if c == time_col or c.startswith("time") or "_" not in c:
+            continue
+        svc, metric = c.rsplit("_", 1)
+        tuples.append((svc, metric, "value"))
+        keep.append(c)
+    sub = df[keep].copy()
+    sub.columns = pd.MultiIndex.from_tuples(tuples)
+    mask = (t < inject_time).to_numpy()
+    return sub[mask], sub[~mask]
+
+
+@dataclass
+class BenchEval:
+    n: int = 0
+    top1: int = 0
+    top3: int = 0
+    detected: int = 0
+    per_fault: dict = field(default_factory=dict)
+
+    def add(self, fault: str, truth: str, ranked: list[str]):
+        self.n += 1
+        h1 = bool(ranked[:1]) and ranked[0] == truth
+        h3 = truth in ranked[:3]
+        self.detected += len(ranked) > 0
+        self.top1 += h1
+        self.top3 += h3
+        f = self.per_fault.setdefault(fault, {"n": 0, "top1": 0, "top3": 0})
+        f["n"] += 1
+        f["top1"] += h1
+        f["top3"] += h3
+
+
+def evaluate_system(
+    system_dir: str,
+    system: str = "OB",
+    signal: str = "within_domain_selective",
+    z_thr: float = Z_DEFAULT,
+) -> BenchEval:
+    """Run the verbatim causal rule over every RE1 case in ``system_dir``.
+
+    ``signal`` selects the (reused) elevated signal: ``"within_domain"`` (>=1
+    metric) or ``"within_domain_selective"`` (>=2 metrics). The ranking rule is
+    identical to PetShop and the live engine.
+    """
+    deps = SYSTEM_DEPS[system]
+    min_metrics = 2 if signal == "within_domain_selective" else 1
+    ev = BenchEval()
+    for case in sorted(os.listdir(system_dir)):
+        cdir = os.path.join(system_dir, case)
+        if case.startswith(".") or not os.path.isdir(cdir) or "_" not in case:
+            continue
+        truth, fault = case.rsplit("_", 1)
+        if fault not in FAULTS:
+            continue
+        for inst in sorted(os.listdir(cdir)):
+            idir = os.path.join(cdir, inst)
+            csv = os.path.join(idir, "data.csv")
+            itf = os.path.join(idir, "inject_time.txt")
+            if not (os.path.isfile(csv) and os.path.isfile(itf)):
+                continue
+            inject_time = int(open(itf).read().strip())
+            normal, abnormal = load_case(csv, inject_time)
+            if len(normal) < 3 or len(abnormal) < 1:
+                continue
+            elevated = within_domain_elevated(normal, abnormal, z_thr, min_metrics)
+            ev.add(fault, truth, rank_candidates(elevated, deps))
+    return ev
