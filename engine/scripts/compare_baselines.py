@@ -1,0 +1,108 @@
+"""Apples-to-apples baseline comparison on RCAEval RE1: Sentinel vs BARO.
+
+Runs BARO (Pham et al.'s RobustScorer, from the RCAEval repo) over the *same*
+RE1 cases, under the *same* candidate set and the *same* service-level AC@k as
+Sentinel, so the only thing that differs is the ranking algorithm.
+
+Setup (BARO's real code is not on PyPI as a usable wheel — clone the repo):
+    git clone --depth 1 https://github.com/phamquiluan/RCAEval /path/to/RCAEval
+    RCAEVAL_SRC=/path/to/RCAEval make compare-baselines   # or run this script
+
+BARO is invoked in RCAEval's **documented** config (`dk_select_useful=False`,
+the setting `main.py` uses; `dk_select_useful=True` is tuned to RCAEval's internal
+column format and drops all columns here, so it is not applicable). Windowing the
+series to the official 20-min window changes nothing (verified). These are BARO
+numbers **reproduced in our harness**, not BARO's (unavailable) published RE1 table.
+
+Outputs (git-ignored): artifacts/baseline_comparison.json
+"""
+from __future__ import annotations
+
+import importlib.util
+import json
+import os
+import sys
+import warnings
+from pathlib import Path
+
+warnings.filterwarnings("ignore")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+import pandas as pd  # noqa: E402
+
+from sentinel.rca_rcaeval import SYSTEM_DEPS, FAULTS  # noqa: E402
+
+ART = Path(__file__).resolve().parents[1] / "artifacts"
+SYS = {"OB": ("RE1-OB", "online-boutique"), "SS": ("RE1-SS", "sock-shop"), "TT": ("RE1-TT", "train-ticket")}
+# Sentinel's measured RE1 numbers (best signal per system): (AC@1, AC@3, Avg@5)
+SENTINEL = {"OB": (0.808, 0.936, 0.910), "SS": (0.872, 0.960, 0.947), "TT": (0.864, 0.960, 0.942)}
+
+
+def _load_baro():
+    src = os.environ.get("RCAEVAL_SRC")
+    if not src or not os.path.isfile(os.path.join(src, "RCAEval/e2e/baro.py")):
+        sys.exit("set RCAEVAL_SRC to a cloned RCAEval repo (git clone https://github.com/phamquiluan/RCAEval)")
+    sys.path.insert(0, src)  # so baro.py's `from RCAEval.io.time_series import ...` resolves
+    spec = importlib.util.spec_from_file_location("baro_mod", os.path.join(src, "RCAEval/e2e/baro.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # bypasses e2e/__init__ (which needs causallearn)
+    return mod.baro
+
+
+def _dedup(seq):
+    out = []
+    for x in seq:
+        if x not in out:
+            out.append(x)
+    return out
+
+
+def baro_scores(baro, code: str):
+    arch, ds = SYS[code]
+    root = ART / "rcaeval" / arch / arch
+    deps = SYSTEM_DEPS[code]
+    hits = {k: 0 for k in range(1, 6)}
+    n = 0
+    for case in sorted(os.listdir(root)):
+        cdir = root / case
+        if "_" not in case or not cdir.is_dir():
+            continue
+        truth, fault = case.rsplit("_", 1)
+        if fault not in FAULTS:
+            continue
+        for inst in sorted(os.listdir(cdir)):
+            csv, itf = cdir / inst / "data.csv", cdir / inst / "inject_time.txt"
+            if not (csv.is_file() and itf.is_file()):
+                continue
+            it = int(itf.read_text().strip())
+            r = baro(pd.read_csv(csv), inject_time=it, dataset=ds, dk_select_useful=False)
+            ranks = [s for s in _dedup([c.rsplit("_", 1)[0] for c in r["ranks"]]) if s in deps]
+            n += 1
+            for k in range(1, 6):
+                if truth in ranks[:k]:
+                    hits[k] += 1
+    ac = {k: hits[k] / n for k in hits}
+    return {"n": n, "ac_1": round(ac[1], 3), "ac_3": round(ac[3], 3),
+            "avg_5": round(sum(ac[k] for k in range(1, 6)) / 5, 3)}
+
+
+def main() -> int:
+    baro = _load_baro()
+    print("RCAEval RE1 baseline comparison — Sentinel (causal_root) vs BARO (reproduced, dk=False)\n")
+    print(f"{'sys':4}{'BARO AC@1':>10}{'BARO Avg@5':>11}   {'Sentinel AC@1':>14}{'Sentinel Avg@5':>15}")
+    card = {"benchmark": "RCAEval RE1", "baseline": "BARO (RobustScorer), reproduced in our harness, RCAEval's documented config (dk_select_useful=False)",
+            "note": "Same cases, same candidate set, same service-level AC@k. Reproduced numbers, not BARO's published RE1 table (unavailable). BARO is stronger on richer RE2 telemetry (not compared here).",
+            "systems": {}}
+    for code in ("OB", "SS", "TT"):
+        b = baro_scores(baro, code)
+        s1, s3, s5 = SENTINEL[code]
+        card["systems"][code] = {"baro": b, "sentinel": {"ac_1": s1, "ac_3": s3, "avg_5": s5}}
+        print(f"{code:4}{b['ac_1']:>10.3f}{b['avg_5']:>11.3f}   {s1:>14.3f}{s5:>15.3f}")
+    ART.mkdir(exist_ok=True)
+    (ART / "baseline_comparison.json").write_text(json.dumps(card, indent=2))
+    print("\ncard -> artifacts/baseline_comparison.json")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

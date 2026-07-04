@@ -66,6 +66,25 @@ multivariate-anomalous app service — a *weaker* use of the rule (no symptom
 demotion), yet still Top-1 0.864, because a TT fault's own metric signature
 dominates. CPU/loss remain the cross-system weak spots — a disclosed failure mode.
 
+## Baseline comparison — Sentinel vs BARO (measured, `make compare-baselines`)
+BARO (Pham et al., 2024 — a strong recent metric-based method, RobustScorer) reproduced in
+**our** harness on the **same** cases / candidate set / service-level AC@k, under RCAEval's
+documented config (`dk_select_useful=False`):
+
+| system | BARO AC@1 | BARO Avg@5 | Sentinel AC@1 | Sentinel Avg@5 |
+|---|---:|---:|---:|---:|
+| Online Boutique | 0.720 | 0.885 | **0.808** | **0.910** |
+| Sock Shop | 0.496 | 0.827 | **0.872** | **0.947** |
+| Train Ticket | 0.224 | 0.427 | **0.864** | **0.942** |
+
+Sentinel beats BARO on AC@1 on all three systems (with *either* signal), widening on the
+larger systems, because BARO's `RobustScaler` explodes on near-constant columns that our
+std-floor + multivariate evidence suppress. **Caveats:** reproduced numbers (not BARO's
+published RE1 table); `dk_select_useful=True` was inapplicable (column-format mismatch →
+0.000); **RE1 is metrics-only** and BARO is reportedly stronger on the richer RE2 tier
+(not compared); this is one of 15 baselines (others need heavier deps — future work).
+Reproduce: `git clone https://github.com/phamquiluan/RCAEval && RCAEVAL_SRC=… make compare-baselines`.
+
 ## Scope and boundary (what is / is not claimed)
 - **Measured:** full RE1 (OB + SS + TT, 375 cases). **RE2/RE3** tiers are **not yet
   included**.

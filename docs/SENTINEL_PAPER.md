@@ -278,6 +278,43 @@ Avg@5 ≈ 0.46 (CIRCA) / 0.54 (RCD) / ~0.74–0.80 (BARO) on Train Ticket, and B
 RE2-Online-Boutique is 0.144 (Avg@5 0.742), indicating exact top-1 is hard on these
 benchmarks. Those are RE2 numbers and are **not** comparable to our RE1 results.
 
+### 7.2c Baseline comparison — Sentinel vs BARO on RE1 (apples-to-apples, measured)
+
+To contextualize the RE1 numbers we compare against **BARO** (Pham et al., 2024 — the
+RobustScorer that introduced the RE datasets and a strong recent metric-based method),
+reproduced in **our** harness on the **same** cases, **same** candidate set, and **same**
+service-level AC@k, under RCAEval's **documented** config (`dk_select_useful=False`, the
+setting `main.py` uses). The only thing that differs is the ranking algorithm.
+
+| system | BARO AC@1 | BARO AC@3 | BARO Avg@5 | Sentinel AC@1 | Sentinel AC@3 | Sentinel Avg@5 |
+|---|---:|---:|---:|---:|---:|---:|
+| Online Boutique | 0.720 | 0.928 | 0.885 | **0.808** | **0.936** | **0.910** |
+| Sock Shop | 0.496 | 0.896 | 0.827 | **0.872** | **0.960** | **0.947** |
+| Train Ticket | 0.224 | 0.456 | 0.427 | **0.864** | **0.960** | **0.942** |
+
+*(Sentinel = best of its two a-priori signals; broad on OB, selective on SS/TT.)*
+
+**Sentinel outperforms BARO on AC@1 across all three systems — with *either* of its two
+signals** (e.g. even Sentinel-selective's AC@1 0.800/0.872/0.864 beats BARO's
+0.720/0.496/0.224), and on AC@3/Avg@5 with its best signal. The gap widens sharply on the
+larger systems (TT AC@1 0.864 vs 0.224). **Why:** BARO ranks individual metric columns by
+`RobustScaler` (median/IQR) magnitude, which *explodes* on near-constant columns (tiny IQR
+→ huge z on noise) — frequent on Train Ticket's ~40 services. Sentinel's **std-floor**
+`max(bstd, 0.10·|bmean|, 1e-9)`, its **per-service** aggregation, and (selective)
+**multivariate-evidence** requirement suppress exactly this failure mode.
+
+**Fairness caveats, stated plainly.** (i) These are BARO numbers **reproduced in our
+harness**, not BARO's published RE1 table (which we could not obtain); we ran its own code
+in RCAEval's documented config. (ii) `dk_select_useful=True` (domain-knowledge column
+selection) is tuned to RCAEval's internal column format and dropped all columns here
+(AC@1 → 0.000), so it is not applicable; windowing to the official 20-min window changes
+nothing. (iii) **RE1 is metrics-only**; BARO is designed for and reportedly stronger on the
+richer **RE2** telemetry (logs+traces, Avg@5 ≈ 0.8 on RE2-TT) — that setting is **not**
+compared here. (iv) This is **one** of RCAEval's 15 baselines; several others (RCD, CIRCA,
+…) require heavier dependencies and are future work. On OB specifically, Sentinel's Avg@5
+edge needs the *broad* signal (0.910); the selective signal's Avg@5 (0.811) trails BARO
+(0.885) because of its lower coverage — the §7.3 trade-off, disclosed.
+
 ### 7.3 The detection↔localization coupling (the core finding)
 
 Three measured facts, in order:
