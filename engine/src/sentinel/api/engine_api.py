@@ -537,8 +537,14 @@ _RCAEVAL_CARD = {
             "within_domain": {"n": 125, "top_1": 0.792, "top_3": 0.864, "coverage": 1.0},
             "within_domain_selective": {"n": 125, "top_1": 0.872, "top_3": 0.960, "coverage": 1.0},
         },
+        "TT": {
+            "graph": "graph-free (no verified RE1 call graph); causal_root reduces to loudest multivariate-anomalous app service",
+            "within_domain": {"n": 125, "top_1": 0.664, "top_3": 0.904, "coverage": 1.0},
+            "within_domain_selective": {"n": 125, "top_1": 0.864, "top_3": 0.960, "coverage": 0.992},
+        },
     },
-    "scope": "RE1-OB + RE1-SS (125 cases each) measured; RE1-TT + RE2/RE3 not yet included; no baseline comparison claimed yet.",
+    "aggregate_selective": {"cases": 375, "top_1": 0.845, "top_3": 0.912},
+    "scope": "Full RE1 (OB+SS+TT, 375 cases) measured; OB/SS use the topology graph, TT is graph-free. RE2/RE3 not yet included; no baseline comparison claimed yet.",
 }
 
 
@@ -550,7 +556,7 @@ def _rcaeval_card():
     if fresh.exists():
         try:
             data = json.loads(fresh.read_text())
-            for k in ("systems", "tier", "scope", "metric_def", "candidate_set"):
+            for k in ("systems", "tier", "scope", "metric_def", "candidate_set", "aggregate_selective"):
                 if k in data:
                     card[k] = data[k]
             card["source"] = "reproduced (this machine)"

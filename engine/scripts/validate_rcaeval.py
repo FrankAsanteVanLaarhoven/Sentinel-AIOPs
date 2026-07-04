@@ -31,7 +31,7 @@ ZENODO = "https://zenodo.org/api/records/14590730/files/{name}.zip/content"
 ART = Path(__file__).resolve().parents[1] / "artifacts"
 CACHE = ART / "rcaeval"
 # RE1 (metrics-only) systems we have topology graphs for.
-SYSTEMS = {"OB": "RE1-OB", "SS": "RE1-SS"}
+SYSTEMS = {"OB": "RE1-OB", "SS": "RE1-SS", "TT": "RE1-TT"}
 
 
 def ensure(system_code: str, archive: str) -> str:
@@ -57,7 +57,7 @@ def main() -> int:
         "signal_note": "within-domain elevated signal (z>=3), same as PetShop, fixed a priori.",
         "candidate_set": "Candidates = the injectable application/routing services (the benchmark's ground-truth granularity), per each system's static topology. This uniformly excludes host node-exporters, `*-exporter`, istio passthrough/external endpoints, network-only istio stubs, and datastores/brokers (redis, `*-db`, rabbitmq) — none of which RCAEval labels as a root cause. A modeling choice, disclosed; not label tuning.",
         "systems": {},
-        "scope": "Online Boutique (RE1-OB) + Sock Shop (RE1-SS), 125 cases each, measured. Train Ticket (RE1-TT) and RE2/RE3 not yet included; no baseline comparison claimed yet.",
+        "scope": "Full RE1 measured: Online Boutique + Sock Shop + Train Ticket, 125 cases each (375 total). OB/SS use the topology graph; TT is graph-free (no verified RE1 call graph). RE2/RE3 not yet included; no baseline comparison claimed yet.",
     }
     for code, archive in SYSTEMS.items():
         if code not in SYSTEM_DEPS:
@@ -78,6 +78,14 @@ def main() -> int:
             }
         card["systems"][code] = sys_card
         print()
+    sel = [s["within_domain_selective"] for s in card["systems"].values()]
+    tot = sum(x["n"] for x in sel)
+    if tot:
+        card["aggregate_selective"] = {
+            "cases": tot,
+            "top_1": round(sum(x["top_1"] * x["n"] for x in sel) / tot, 3),
+            "top_3": round(sum(x["top_3"] * x["n"] for x in sel) / tot, 3),
+        }
     (ART / "rcaeval_card.json").write_text(json.dumps(card, indent=2))
     print("card -> artifacts/rcaeval_card.json")
     return 0

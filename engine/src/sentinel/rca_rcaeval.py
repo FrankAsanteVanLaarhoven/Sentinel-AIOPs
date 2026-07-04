@@ -53,7 +53,32 @@ SS_DEPS: dict[str, list[str]] = {
     "shipping": [], "queue-master": [],
 }
 
-SYSTEM_DEPS = {"OB": OB_DEPS, "SS": SS_DEPS}
+# Train Ticket. RE1 is metrics-only, so no verified call graph is available for
+# its ~40 services; we therefore run TT **graph-free** — candidates are the
+# injectable application services (all `ts-*-service`, excluding the `ts`
+# aggregate and the `*-mongo`/`*-mysql` datastores), with no dependency edges.
+# With an empty graph `causal_root` reduces to "loudest multivariate-anomalous
+# app service". This is a weaker use of the rule than OB/SS (no symptom demotion),
+# disclosed as such; a verified TT topology (or one derived from RE2/RE3 traces)
+# is future work.
+TT_APP_SERVICES = [
+    "ts-admin-basic-info-service", "ts-admin-order-service", "ts-admin-route-service",
+    "ts-admin-travel-service", "ts-admin-user-service", "ts-assurance-service",
+    "ts-auth-service", "ts-avatar-service", "ts-basic-service", "ts-cancel-service",
+    "ts-config-service", "ts-consign-price-service", "ts-consign-service",
+    "ts-contacts-service", "ts-execute-service", "ts-food-map-service", "ts-food-service",
+    "ts-inside-payment-service", "ts-news-service", "ts-notification-service",
+    "ts-order-other-service", "ts-order-service", "ts-payment-service",
+    "ts-preserve-other-service", "ts-preserve-service", "ts-price-service",
+    "ts-rebook-service", "ts-route-plan-service", "ts-route-service", "ts-seat-service",
+    "ts-security-service", "ts-station-service", "ts-ticket-office-service",
+    "ts-ticketinfo-service", "ts-train-service", "ts-travel-plan-service",
+    "ts-travel-service", "ts-travel2-service", "ts-user-service",
+    "ts-verification-code-service", "ts-voucher-service",
+]
+TT_DEPS: dict[str, list[str]] = {s: [] for s in TT_APP_SERVICES}
+
+SYSTEM_DEPS = {"OB": OB_DEPS, "SS": SS_DEPS, "TT": TT_DEPS}
 FAULTS = ("cpu", "mem", "disk", "delay", "loss")
 
 

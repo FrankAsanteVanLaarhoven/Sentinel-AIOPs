@@ -228,35 +228,44 @@ The log detector is high-precision / moderate-recall — a trustworthy-when-it-f
 | within-domain broad (≥1) | 0.206 / 0.208 | 0.441 / 0.438 | **0.971 / 0.958** | 8.8 |
 | within-domain selective (≥2) | 0.250 / 0.229 | 0.471 / 0.396 | 0.941 / 0.917 | 6.3 |
 
-### 7.2b Standardized benchmark — RCAEval RE1 (measured, two systems)
+### 7.2b Standardized benchmark — RCAEval RE1 (measured, full tier, three systems)
 
 The same verbatim `causal_root`, run through a thin adapter on the public RCAEval
-benchmark (Pham et al., 2025), RE1 tier (metrics-only), **Online Boutique (OB)** and
-**Sock Shop (SS)** — 125 cases each (5 injected services × 5 fault types × 5
-instances; ground-truth service encoded in the case directory). Top-k = ground-truth
-service within the top-k ranked candidates.
+benchmark (Pham et al., 2025), RE1 tier (metrics-only), across all three systems —
+**Online Boutique (OB)**, **Sock Shop (SS)**, **Train Ticket (TT)** — 125 cases each
+(**375 total**; 5 injected services × 5 fault types × 5 instances; ground-truth service
+encoded in the case directory). Top-k = ground-truth service within the top-k candidates.
 
-| system | elevated signal | Top-1 | Top-3 | coverage |
-|---|---|---:|---:|---:|
-| OB | broad (≥1 metric) | **0.808** | **0.936** | 0.992 |
-| OB | selective (≥2 metrics) | 0.800 | 0.816 | 0.840 |
-| SS | broad (≥1 metric) | 0.792 | 0.864 | 1.000 |
-| SS | **selective (≥2 metrics)** | **0.872** | **0.960** | 1.000 |
+| system | graph | signal | Top-1 | Top-3 | coverage |
+|---|---|---|---:|---:|---:|
+| OB | topology | broad (≥1) | **0.808** | 0.936 | 0.992 |
+| OB | topology | selective (≥2) | 0.800 | 0.816 | 0.840 |
+| SS | topology | broad (≥1) | 0.792 | 0.864 | 1.000 |
+| SS | topology | **selective (≥2)** | **0.872** | **0.960** | 1.000 |
+| TT | graph-free | broad (≥1) | 0.664 | 0.904 | 1.000 |
+| TT | graph-free | **selective (≥2)** | **0.864** | **0.960** | 0.992 |
+| **aggregate** | | **selective** | **0.845** | **0.912** | — |
 
 **Candidate set (disclosed modeling choice).** Candidates are the injectable
 application/routing services — RCAEval's ground-truth granularity — so infra nodes
 (host node-exporters, `*-exporter`, istio passthrough/stubs, datastores/brokers) are
-uniformly excluded; they are never labelled root causes. This is a category decision
-fixed a priori, not label tuning; without it, infra nodes become spurious roots
-(OB broad Top-1 falls to 0.664).
+uniformly excluded; they are never labelled root causes. A category decision fixed a
+priori, not label tuning; without it, infra nodes become spurious roots (OB broad
+Top-1 falls to 0.664).
 
-**Reading it.** On the richer-metric Sock Shop the **selective** (multivariate-evidence)
-signal is decisively better (Top-1 0.792→0.872, Top-3 0.864→0.960), the same effect
-measured on PetShop, now on two independent systems. Per-fault Top-1 (selective):
-OB delay/disk/mem = 1.000, cpu 0.360, loss 0.640; SS disk 0.960, cpu 0.920, mem 0.880.
-**Scope:** RE1-OB + RE1-SS only; RE1-TT and RE2/RE3 not yet included; no comparison to
-RCAEval's 15 baselines is claimed yet (that requires their per-system reported numbers).
-z = 3 / `min_metrics` were fixed a priori, not tuned on RCAEval.
+**Train Ticket is run graph-free.** RE1 provides no verified call graph for TT's ~40
+services, so `causal_root` reduces to the loudest multivariate-anomalous app service
+(no symptom demotion) — a *weaker* use of the rule, disclosed as such; a verified TT
+topology (or one derived from RE2/RE3 traces) is future work.
+
+**Reading it.** Across three independent systems the **selective** (multivariate-evidence)
+signal gives Top-1 0.800 / 0.872 / 0.864 (aggregate **0.845**; Top-3 **0.912**) — the same
+effect first measured on PetShop, now consistent at scale. Broad over-elevates on the
+richer-metric systems, so selective is decisively better there (SS 0.792→0.872). Per-fault
+Top-1 (selective): OB delay/disk/mem 1.000, cpu 0.360, loss 0.640; TT cpu/mem 1.000, loss
+0.640. **Scope:** full RE1 only; RE2/RE3 not yet included; no comparison to RCAEval's 15
+baselines is claimed yet (that requires their per-system reported numbers). z = 3 /
+`min_metrics` were fixed a priori, not tuned on RCAEval.
 
 ### 7.3 The detection↔localization coupling (the core finding)
 

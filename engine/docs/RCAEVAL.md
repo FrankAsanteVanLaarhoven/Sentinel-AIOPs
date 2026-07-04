@@ -34,29 +34,39 @@ Reproduce: `make install-ml && make validate-rcaeval`.
 - **Metric:** **Top-k** = the ground-truth service is within the top-k ranked
   candidates; **coverage** = fraction of cases with any candidate.
 
-## Result — RE1-OB + RE1-SS (125 cases each), measured
+## Result — full RE1 (OB + SS + TT, 125 cases each = 375), measured
 
-| system | elevated signal | Top-1 | Top-3 | coverage |
-|---|---|---:|---:|---:|
-| Online Boutique (OB) | broad (≥1 metric) | **0.808** | **0.936** | 0.992 |
-| | selective (≥2 metrics) | 0.800 | 0.816 | 0.840 |
-| Sock Shop (SS) | broad (≥1 metric) | 0.792 | 0.864 | 1.000 |
-| | **selective (≥2 metrics)** | **0.872** | **0.960** | 1.000 |
+| system | graph | elevated signal | Top-1 | Top-3 | coverage |
+|---|---|---|---:|---:|---:|
+| Online Boutique (OB) | topology | broad (≥1) | **0.808** | 0.936 | 0.992 |
+| | | selective (≥2) | 0.800 | 0.816 | 0.840 |
+| Sock Shop (SS) | topology | broad (≥1) | 0.792 | 0.864 | 1.000 |
+| | | **selective (≥2)** | **0.872** | **0.960** | 1.000 |
+| Train Ticket (TT) | graph-free | broad (≥1) | 0.664 | 0.904 | 1.000 |
+| | | **selective (≥2)** | **0.864** | **0.960** | 0.992 |
+| **aggregate (375)** | | **selective** | **0.845** | **0.912** | — |
 
 **Per-fault Top-1 (selective).** OB: delay/disk/mem = 1.000, cpu 0.360, loss 0.640.
-SS: disk 0.960, cpu 0.920, mem 0.880, delay 0.800, loss 0.800.
+SS: disk 0.960, cpu 0.920, mem 0.880, delay/loss 0.800. TT: cpu/mem 1.000, disk 0.920,
+delay 0.760, loss 0.640.
 
-**Reading it.** The two signals trade off differently per system: on OB broad is
-marginally sharper at Top-1 (0.808) while selective wins the harder faults; on the
-richer-metric SS, **selective is decisively better** (Top-1 0.792→0.872,
-Top-3 0.864→0.960) because broad over-elevates when every service exposes ~30
-metrics. This is the same multivariate-evidence effect measured on PetShop, now on
-two independent microservice systems. CPU/loss on OB remain the weak spots — a
-disclosed failure mode.
+**Reading it.** Across three independent microservice systems the **selective**
+(multivariate-evidence) signal gives Top-1 0.800 / 0.872 / 0.864 — the same effect
+first measured on PetShop, now consistent at scale. Broad over-elevates on the
+richer-metric systems (SS/TT), so selective is decisively better there (SS Top-1
+0.792→0.872). **Train Ticket is run graph-free** (see below): RE1 has no verified
+call graph for its ~40 services, so `causal_root` reduces to the loudest
+multivariate-anomalous app service — a *weaker* use of the rule (no symptom
+demotion), yet still Top-1 0.864, because a TT fault's own metric signature
+dominates. CPU/loss remain the cross-system weak spots — a disclosed failure mode.
 
 ## Scope and boundary (what is / is not claimed)
-- **Measured:** RE1-OB + RE1-SS (250 cases). **Train Ticket (RE1-TT)** and the
-  **RE2/RE3** tiers are **not yet included**.
+- **Measured:** full RE1 (OB + SS + TT, 375 cases). **RE2/RE3** tiers are **not yet
+  included**.
+- **Train Ticket is graph-free.** OB and SS use their static topology graph (symptom
+  demotion); TT has no verified RE1 call graph, so it is ranked by anomaly magnitude
+  over the app-service candidate set. A verified TT topology (or one derived from
+  RE2/RE3 traces) is future work and could change TT's numbers either way.
 - **No baseline comparison is claimed yet** — these are Sentinel's own numbers;
   positioning against RCAEval's 15 baselines requires their per-system reported
   results and is future work.

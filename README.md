@@ -44,7 +44,7 @@ running any pipeline.
 | Detection (learned) | Metric detector | SMD | **F1 0.210** / PA-F1 0.35 *(conservative train-only threshold)* |
 | Localization (deterministic) | `causal_root` | synthetic | **5/5** ground-truth agreement |
 | Validation (empirical) | `causal_root` | PetShop | **recall@1 0.265** / recall@3 0.471 · coverage 0.706 (→ 0.971 within-domain) |
-| Benchmark (standardized) | `causal_root` | RCAEval RE1 (OB, SS) | OB **Top-1 0.808** / Top-3 0.936 · SS **Top-1 0.872** / Top-3 0.960 · 125 cases each *(TT + RE2/RE3 next)* |
+| Benchmark (standardized) | `causal_root` | RCAEval RE1 (OB+SS+TT) | selective **Top-1 0.845** / **Top-3 0.912** across **375 cases** (OB 0.800 · SS 0.872 · TT 0.864) *(RE2/RE3 next)* |
 
 No invented numbers; no cross-domain transfer is claimed (the detectors are standalone real-data capabilities).
 The within-domain result closes the coverage gap **but** costs localization precision — reported as a
@@ -75,7 +75,7 @@ make verify          # 5/5 synthetic scenarios at 100% ground truth
 make train-logdet    # HDFS log detector   → P 0.992 / R 0.564 / F1 0.719 / AUC 0.787
 make train-metricdet # SMD metric detector → P 0.142 / R 0.403 / F1 0.210 / PA-F1 0.35
 make validate-rca    # PetShop localization + within-domain trade-off (target vs all-metrics signal)
-make validate-rcaeval# RCAEval RE1 (OB+SS, 250 cases) → OB Top-1 0.808 · SS Top-1 0.872 (deterministic causal_root)
+make validate-rcaeval# RCAEval RE1 (OB+SS+TT, 375 cases) → selective Top-1 0.845 / Top-3 0.912 (deterministic causal_root)
 make test            # 18/18 hermetic tests (offline)
 ```
 Corpora and trained weights are git-ignored and regenerated from source; the repo commits only the
