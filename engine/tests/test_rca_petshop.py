@@ -82,6 +82,26 @@ def test_within_domain_selective_requires_multivariate_evidence():
     assert "A" not in selective and "B" in selective
 
 
+def test_robust_elevation_recovers_shift_masked_by_baseline_spikes():
+    # A's baseline carries a couple of spikes that inflate mean/std, so a modest but genuine
+    # upward shift is buried (z < 3) under the standard statistic. Median/IQR is unaffected by
+    # the spikes and recovers the shift — the mechanism behind the RE3 robust-elevation change.
+    cols = pd.MultiIndex.from_tuples([("A", "latency", "Average"), ("B", "latency", "Average")])
+    base = pd.DataFrame(np.column_stack([
+        np.array([100, 100, 100, 100, 100, 100, 100, 400], float),  # A: spiky baseline
+        np.full(8, 100.0),                                          # B: flat
+    ]), columns=cols)
+    abn = pd.DataFrame(np.column_stack([
+        np.full(8, 160.0),   # A: modest, real upward shift
+        np.full(8, 100.0),   # B: unchanged
+    ]), columns=cols)
+
+    std = within_domain_elevated(base, abn, z_thr=3.0)                # mean/std (default)
+    rob = within_domain_elevated(base, abn, z_thr=3.0, robust=True)   # median/IQR
+    assert "A" not in std                       # the inflated std masks the shift
+    assert "A" in rob and "B" not in rob        # robust recovers A; B stays quiet
+
+
 def test_no_anomaly_yields_no_candidates():
     normal = _frame({"A": 100, "B": 100})
     abnormal = _frame({"A": 101, "B": 100})  # within noise -> nothing elevated

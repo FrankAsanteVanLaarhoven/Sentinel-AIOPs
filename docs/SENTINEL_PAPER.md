@@ -423,13 +423,26 @@ faults **metric-only BARO beats Sentinel** on both AC@1 (0.784 vs 0.494) and Avg
 0.655), with the gap widest on Sock Shop (0.233 vs 0.633). The reason is structural: `causal_root`
 elevates a service only on a strong two-sided **z ≥ 3** metric shift — the signature of resource and
 network faults — whereas code-level faults perturb metrics **subtly**, below that threshold, so the
-rule does not *see* many of them (low coverage → low AC@1). BARO's robust median/IQR scorer picks
-up the faint distributional shift that the fixed z ≥ 3 gate misses. This delineates the **operating
-envelope** of the inspectable rule precisely: strong on stress/latency faults (RE1/RE2), weak on
-subtle code-level faults (RE3). It also motivates the two levers deferred to Paper 2 — a *calibrated
-soft-elevation* detector (continuous magnitude, not a binary z-gate) and genuine *multi-source*
-signals (logs/traces), where code-level faults leave their clearest evidence. Reproduce:
-`TIER=RE3 make validate-rcaeval-re2` and `TIER=RE3 make compare-baselines`.
+rule does not *see* many of them (low coverage → low AC@1). This delineates the **operating envelope** of the inspectable rule precisely: strong on stress/latency
+faults (RE1/RE2), weak on subtle code-level faults (RE3).
+
+We probed *why*, as a controlled ablation (`scripts/robust_elevation_experiment.py`), changing one lever
+at a time while holding `causal_root` and the candidate set fixed. Swapping the statistic to BARO's
+robust **median/IQR** scorer and relaxing the hard **z ≥ 3** gate to a soft, threshold-free magnitude —
+the two levers a "subtle-shift" account implicates — does **not** close the gap: on RE3 the robust
+variant scores AC@1 **0.448** and the soft (no-gate) variants **0.402–0.471**, all at or below the
+committed **0.494**, while BARO stays at 0.784. The gap is therefore not the deviation statistic or the
+elevation threshold but the **ranking rule**: BARO orders services by anomaly magnitude alone, whereas
+`causal_root` applies a **dependency demotion** — a service is a root only if none of its dependencies are
+also elevated. Resource/network faults propagate along the call graph, so that demotion helps (RE1/RE2);
+code-level faults do **not** propagate cleanly, so a faulty service's own dependencies co-elevate and the
+true root is demoted — the very inspectable causal step that is Sentinel's contribution. Closing RE3
+within a metrics-only rule would therefore mean discarding that step (i.e. reimplementing a magnitude
+ranker), so we treat **0.494 as the honest ceiling of the causal rule** and keep genuine **multi-source**
+signals (logs/traces, where code-level faults leave their clearest evidence) as the Paper 2 lever — not
+the soft-elevation detector an earlier draft implicated, which this ablation rules out. Reproduce:
+`TIER=RE3 python scripts/robust_elevation_experiment.py` (ablation), then `TIER=RE3 make
+validate-rcaeval-re2` and `TIER=RE3 make compare-baselines` (tier scores).
 
 **The three tiers together** draw the boundary cleanly: the metrics-only deterministic rule is
 competitive-to-superior against metric-only BARO on resource/network faults (RE1 AC@1 0.845, RE2
@@ -455,7 +468,7 @@ Three measured facts, in order:
 | Localization (deterministic) | `causal_root` | PetShop | recall@1 0.265 / recall@3 0.471, coverage 0.706 |
 | Localization (deterministic) | `causal_root` | RCAEval RE1 | AC@1 0.845 / Avg@5 0.900 (375 cases); beats reproduced BARO on AC@1 |
 | Localization (deterministic) | `causal_root` (metrics-only) | RCAEval RE2 | AC@1 0.815 / Avg@5 0.873 (270 cases); beats metric-only BARO on AC@1 (framing A) |
-| Localization (deterministic) | `causal_root` (metrics-only) | RCAEval RE3 | AC@1 0.494 / Avg@5 0.655 (87 cases, code-level faults); **outperformed** by metric-only BARO (0.784 / 0.909) — the z≥3 rule's ceiling (§7.2f) |
+| Localization (deterministic) | `causal_root` (metrics-only) | RCAEval RE3 | AC@1 0.494 / Avg@5 0.655 (87 cases, code-level faults); **outperformed** by metric-only BARO (0.784 / 0.909) — the causal rule's ceiling; an ablation confirms robust/soft elevation does not close it (§7.2f) |
 | System | full suite | — | 44/44 hermetic tests |
 
 ---
@@ -525,7 +538,7 @@ The result that most shapes the research program is negative: within-domain dete
 ## 12. Future Work
 
 1. **Restore held-out localization precision under broad detection** — per-node PCA reconstruction where dimensionality allows, magnitudes that down-weight ubiquitously-noisy metrics, or a learned within-domain detector — evaluated on the held-out split, not the combined set.
-2. **Calibrated soft-elevation** — feed detector confidence into `causal_root` as a continuous magnitude, decoupling coverage from the binary saturation that hurts precision; the per-detector calibration machinery and measurements now exist (§7.1b).
+2. **Calibrated soft-elevation** — feed detector confidence into `causal_root` as a continuous magnitude, decoupling coverage from the binary saturation that hurts precision; the per-detector calibration machinery and measurements now exist (§7.1b). Scope note: the RE3 ablation (§7.2f) shows soft/robust elevation does **not** by itself recover code-level-fault localization — its value is the coverage/precision coupling, not the RE3 ranking gap.
 3. **Extend the governed hand-off to production** — the `ActionProposal` → VerdictPlane loop (deterministic decision + enforcement behind a real human gate and a tamper-evident ledger) is built and demonstrated (§3.7); remaining work is wiring a *learned* detection signal into the live engine behind that boundary, and real reviewer workflows at scale, so a learned signal can inform but never unilaterally drive action.
 4. **Multi-source detection and heavier baselines** — the full RE1–RE3 metrics-only sweep is done (§7.2b–f): RE1/RE2 competitive-to-superior vs metric-only BARO, RE3 (code-level faults) out-scored — the rule's envelope. The clear next lever is a *multi-source* extension that actually consumes logs/traces (the regime where trace methods and code-level faults have the edge — Paper 2), plus heavier causal baselines (**RCD, CIRCA, MicroCause**) under the same candidate set and splits.
 5. **A user study of the gate** — measure whether the method/confidence/failure-mode trace changes operator trust and time-to-decision.

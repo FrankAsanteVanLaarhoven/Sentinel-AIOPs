@@ -73,6 +73,7 @@ def within_domain_elevated(
     abnormal: pd.DataFrame,
     z_thr: float = Z_DEFAULT,
     min_metrics: int = 1,
+    robust: bool = False,
 ) -> dict[str, float]:
     """Within-domain detection signal over a node's full metric vector.
 
@@ -108,9 +109,19 @@ def within_domain_elevated(
             )
             if len(b) < 3 or len(a) < 1:
                 continue
-            bmean, bstd = float(b.mean()), float(b.std())
-            floor = max(bstd, 0.10 * abs(bmean), 1e-9)
-            zs.append(abs((float(a.mean()) - bmean) / floor))
+            if robust:
+                # Robust location/scale: median + IQR (BARO's statistic). IQR/1.349 ~= sigma
+                # for a normal baseline, so z_thr stays interpretable; unlike mean/std it is
+                # not inflated by a few baseline spikes, so smaller genuine shifts (e.g. RE3
+                # code-level faults) still clear the gate instead of being masked.
+                bmed = float(b.median())
+                iqr = float(b.quantile(0.75) - b.quantile(0.25))
+                scale = max(iqr / 1.349, 0.10 * abs(bmed), 1e-9)
+                zs.append(abs((float(a.median()) - bmed) / scale))
+            else:
+                bmean, bstd = float(b.mean()), float(b.std())
+                floor = max(bstd, 0.10 * abs(bmean), 1e-9)
+                zs.append(abs((float(a.mean()) - bmean) / floor))
         zs.sort(reverse=True)
         if len(zs) >= min_metrics and zs[min_metrics - 1] >= z_thr:
             out[str(node)] = zs[0]

@@ -170,6 +170,7 @@ def evaluate_system(
     signal: str = "within_domain_selective",
     z_thr: float = Z_DEFAULT,
     faults: tuple = FAULTS,
+    robust: bool = False,
 ) -> BenchEval:
     """Run the verbatim causal rule over every case in ``system_dir``.
 
@@ -201,7 +202,7 @@ def evaluate_system(
             normal, abnormal = load_case(csv, inject_time)
             if len(normal) < 3 or len(abnormal) < 1:
                 continue
-            elevated = within_domain_elevated(normal, abnormal, z_thr, min_metrics)
+            elevated = within_domain_elevated(normal, abnormal, z_thr, min_metrics, robust=robust)
             # Candidates = known topology nodes only (drops host node-exporters,
             # `*-exporter`, and duplicate istio stubs that are not real services).
             elevated = {s: m for s, m in elevated.items() if s in deps}
