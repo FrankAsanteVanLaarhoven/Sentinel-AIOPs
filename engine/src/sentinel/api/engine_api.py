@@ -22,6 +22,7 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from sentinel.incident_agent import detect, localize, find_root_cause, investigate, _baseline
+from sentinel.action_proposal import build_action_proposal
 from sentinel.telemetry_sim import SERVICES, DEPS, N, INC, SLO_ERR
 from sentinel.tools import TelemetryTools
 from sentinel.providers import get_provider
@@ -210,6 +211,17 @@ def api_investigate(scenario: str = Query("flag_spike")):
         "report": report,
         "demo": DATA_SOURCE == "demo",
     }
+
+
+@app.get("/action-proposal")
+def api_action_proposal(scenario: str = Query("flag_spike")):
+    """Sentinel's typed hand-off to VerdictPlane. Propose-only / fail-closed /
+    human-gated by construction — Sentinel never sets handoff.executed."""
+    scenario = _scn(scenario)
+    inv = api_investigate(scenario)
+    if not inv.get("detected"):
+        return {"detected": False, "method": METHOD}
+    return build_action_proposal(inv, method=METHOD).model_dump()
 
 
 @app.get("/topology")

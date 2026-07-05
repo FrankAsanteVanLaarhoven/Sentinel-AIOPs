@@ -101,6 +101,8 @@ cd engine && DATA_SOURCE=prom PROM_URL=http://prometheus:9090 \
 ```
 
 ## Learn more
+- **[docs/PROJECT_BOUNDARY.md](docs/PROJECT_BOUNDARY.md)** — what Sentinel **does / does not do**, its place in the
+  Autonomous Systems Governance Stack, the typed `ActionProposal` → VerdictPlane contract, and staged enterprise-readiness.
 - **[docs/SENTINEL_PAPER.md](docs/SENTINEL_PAPER.md)** — research paper draft: motivation, analytical related
   work + references, full metric definitions & metric→failure mapping, method, experiment setup, results,
   research-process log, scoped claim boundary, slide outline, and a three-paper route.
@@ -111,7 +113,7 @@ cd engine && DATA_SOURCE=prom PROM_URL=http://prometheus:9090 \
 - **[notebooks/Sentinel_AIOPs_Grandmaster.ipynb](notebooks/Sentinel_AIOPs_Grandmaster.ipynb)** — a runnable,
   Grandmaster-style walkthrough that reproduces the three-layer pipeline end to end.
 - `engine/README.md` · `console/README.md` — component detail.
-- Endpoint reference and model cards: `GET /validation`, `/log-anomaly`, `/metric-anomaly`, `/rca-validation`, `/rcaeval`.
+- Endpoint reference and model cards: `GET /investigate`, `/action-proposal` (typed VerdictPlane hand-off), `/validation`, `/log-anomaly`, `/metric-anomaly`, `/rca-validation`, `/rcaeval`.
 - Benchmark detail: [engine/docs/RCAEVAL.md](engine/docs/RCAEVAL.md) — deterministic localization on the RCAEval corpus.
 
 ---
