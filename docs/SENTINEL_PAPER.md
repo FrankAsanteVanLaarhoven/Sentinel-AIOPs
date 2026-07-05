@@ -139,6 +139,10 @@ The engine emits a stepped investigation (method, confidence, failure modes, cha
 | point-adjusted F1 (uses segment membership) | | ✓ (oracle-flagged) |
 | within-domain broad/selective signals | (optional) | ✓ |
 
+### 3.7 Governed hand-off (propose, never act)
+
+The diagnosis leaves Sentinel as a typed **`ActionProposal`** (`GET /action-proposal`): the localized root, a confidence, the linked evidence, a *measured* evidence-grounding ratio, and a single typed remediation — under a policy that is **propose-only / fail-closed / human-gated by construction** (Sentinel never marks an action executed). Every proposal is appended to a **tamper-evident, hash-chained** audit log (`GET /audit`, `/audit/verify`), replayable by a deterministic proposal id. The proposal is then handed to a **separate deterministic control plane** (VerdictPlane) that returns an allow / deny / require-human verdict and — only on approval — performs the action. Crucially, **Sentinel evaluates no policy and keeps no verdict ledger**: the policy engine, the human gate, and the decision ledger live *behind* that boundary, not in Sentinel. This makes the assistive boundary and the diagnosis's provenance auditable in code rather than by assertion (C6).
+
 ---
 
 ## 4. Evaluation Metrics (fully defined)
@@ -154,6 +158,11 @@ For each metric: **name · formula/definition · what it measures · why it matt
 7. **Detection coverage** · fraction of incidents for which the elevated set is non-empty (some node flagged) · isolates *detection-stage* misses from localization errors · count incidents with `len(rank) > 0` · **diagnostic**.
 8. **Average elevated-set size (avg #elevated)** · mean number of services marked elevated per incident · quantifies graph saturation, the mechanism behind the detection↔localization coupling · mean of `len(elevated)` · **diagnostic**.
 9. **Mean time to detect (MTTD)** · wall-clock (simulated) from fault injection to first breach in a scenario · operational responsiveness · read from the demo timeline · **diagnostic** (demo scenarios only; not a corpus metric).
+10. **Brier score** · `(1/N)·Σ_i (p_i − y_i)²` · mean squared error of a probabilistic prediction (a proper scoring rule) · rewards probabilities that are both calibrated and sharp in one number · over held-out (probability, label) pairs · **diagnostic** (detector confidence quality).
+11. **Expected Calibration Error (ECE)** · bin predictions into M equal-width probability bins, then `Σ_b (n_b/N)·|acc_b − conf_b|` · population-weighted average gap between confidence and empirical accuracy · says whether a 0.9 score really means ~90% · 10 bins over held-out pairs · **diagnostic**.
+12. **Maximum Calibration Error (MCE)** · `max_b |acc_b − conf_b|` · the worst single-bin calibration gap · surfaces an over-confident region the average (ECE) can hide · same bins as ECE · **diagnostic**.
+13. **AC@k (RCAEval)** · fraction of cases whose ground-truth service is within the top-k ranked candidates · RCAEval's localization accuracy at rank k — **identical to our recall@k / Top-k** · rank via `causal_root`, compare `rank[:k]` to the labelled service · **deployable (k=1) + diagnostic**.
+14. **Avg@5 (RCAEval)** · `mean(AC@1…AC@5)` · RCAEval's headline single-number localization score · one comparable number across methods and systems · average of AC@1…AC@5 · **diagnostic**.
 
 ---
 
@@ -428,9 +437,9 @@ The result that most shapes the research program is negative: within-domain dete
 ## 12. Future Work
 
 1. **Restore held-out localization precision under broad detection** — per-node PCA reconstruction where dimensionality allows, magnitudes that down-weight ubiquitously-noisy metrics, or a learned within-domain detector — evaluated on the held-out split, not the combined set.
-2. **Calibrated soft-elevation** — feed detector confidence into `causal_root` as a continuous magnitude, decoupling coverage from the binary saturation that hurts precision.
-3. **Wire detection into the live engine behind guardrails** — with the human gate and a governance layer (cf. related in-path governance work) so a learned signal can inform, but never unilaterally drive, action.
-4. **More RCA corpora and a causal-inference comparison** — position the inspectable baseline against CIRCA/RCD-style methods on shared data.
+2. **Calibrated soft-elevation** — feed detector confidence into `causal_root` as a continuous magnitude, decoupling coverage from the binary saturation that hurts precision; the per-detector calibration machinery and measurements now exist (§7.1b).
+3. **Extend the governed hand-off to production** — the `ActionProposal` → VerdictPlane loop (deterministic decision + enforcement behind a real human gate and a tamper-evident ledger) is built and demonstrated (§3.7); remaining work is wiring a *learned* detection signal into the live engine behind that boundary, and real reviewer workflows at scale, so a learned signal can inform but never unilaterally drive action.
+4. **More of RCAEval and heavier baselines** — RE1 (metrics-only) with two baselines, BARO and ε-Diagnosis, is done (§7.2b–c); extend to the **RE2/RE3** tiers (logs + traces) and to the heavier causal baselines (**RCD, CIRCA, MicroCause**) under the same candidate set and splits.
 5. **A user study of the gate** — measure whether the method/confidence/failure-mode trace changes operator trust and time-to-decision.
 
 ---
@@ -452,13 +461,15 @@ Through-line: **the reasoning that must be trusted stays inspectable; learning i
 3. **Evidence of failure** — ~29% of PetShop incidents never move the target metric (a detection miss, not a localization miss).
 4. **Metric→failure mapping** — the §5 table: which number exposes which failure.
 5. **Method** — the three-layer contract; `causal_root` reused verbatim; only the signal varies.
-6. **Experiment setup** — HDFS / SMD / PetShop / synthetic; splits; train-only thresholds; `make` repro.
-7. **Results** — detectors (0.719 / 0.210); localization (0.265 / 0.471, coverage 0.706); 5/5 synthetic.
-8. **Failures & challenges** — aspirational-vs-measured numbers; point-adjust leakage; two-sided-changes-nothing; over-elevation.
-9. **Refinements** — multivariate selectivity; the held-out check that tempered it.
-10. **Insights** — the coupling is real, mitigable, not solvable by within-domain detection alone.
-11. **Three-paper PhD route** — inspectable core → calibrated detection → governed remediation.
-12. **Next steps** — soft-elevation calibration; held-out precision recovery; user study.
+6. **Experiment setup** — HDFS / SMD / PetShop / RCAEval RE1 / synthetic; splits; train-only thresholds; `make` repro.
+7. **Results — localization** — PetShop (0.265 / 0.471) and standardized RCAEval RE1 (AC@1 0.845 / Avg@5 0.900, 375 cases across three systems); 5/5 synthetic.
+8. **Results — baselines** — beats reproduced BARO on AC@1 on all three RE1 systems (0.81 / 0.87 / 0.86 vs 0.72 / 0.50 / 0.22); a classical ε-Diagnosis baseline far behind.
+9. **Results — detection & calibration** — log F1 0.719, metric F1 0.210; one calibration method, two outcomes (log already calibrated ECE 0.0009; metric recalibrates 0.139 → 0.0002).
+10. **Governed hand-off** — typed `ActionProposal` → tamper-evident audit → VerdictPlane (propose / govern / human gate); the action cannot run until approved.
+11. **Failures & challenges** — aspirational-vs-measured numbers; point-adjust leakage; two-sided-changes-nothing; over-elevation.
+12. **Refinements & the coupling** — multivariate selectivity; the held-out check that tempered it; coverage/precision as a first-class trade-off.
+13. **Three-paper PhD route** — inspectable core → calibrated detection → governed remediation.
+14. **Next steps** — RE2/RE3 + heavier baselines (RCD / CIRCA); soft-elevation calibration; held-out precision recovery; user study.
 
 ---
 
