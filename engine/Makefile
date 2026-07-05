@@ -9,6 +9,8 @@ train-metricdet: ; python scripts/train_metric_anomaly.py   # train+eval metric-
 validate-rca:    ; python scripts/validate_localization.py  # score causal localization on the real PetShop corpus
 validate-rcaeval:; python scripts/validate_rcaeval.py       # score causal localization on the RCAEval benchmark (RE1)
 validate-rcaeval-re2:; TIER=RE2 python scripts/validate_rcaeval_multi.py  # metrics-only causal_root on RE2/RE3 (framing A; TIER=RE3 for RE3)
+derive-tt-graph:; python scripts/derive_tt_graph.py         # derive a verified TT call graph from RE2-TT traces (streams RE2-TT.zip)
+tt-graph-delta:; python scripts/tt_graph_delta.py           # measured trade-off: TT graph-free vs the RE2-derived call graph
 compare-baselines:; python scripts/compare_baselines.py     # Sentinel vs BARO on RE1 (TIER=RE2 for RE2 metric-only; needs RCAEVAL_SRC)
 enforce-demo:    ; python scripts/enforcement_demo.py        # Sentinel rollback under real VerdictPlane enforcement (needs: pip install verdictplane)
 export-audit:    ; python scripts/export_audit.py --format ecs   # SIEM export of the audit log (ECS; use --format cef for ArcSight)

@@ -53,14 +53,18 @@ SS_DEPS: dict[str, list[str]] = {
     "shipping": [], "queue-master": [],
 }
 
-# Train Ticket. RE1 is metrics-only, so no verified call graph is available for
-# its ~40 services; we therefore run TT **graph-free** — candidates are the
-# injectable application services (all `ts-*-service`, excluding the `ts`
-# aggregate and the `*-mongo`/`*-mysql` datastores), with no dependency edges.
-# With an empty graph `causal_root` reduces to "loudest multivariate-anomalous
-# app service". This is a weaker use of the rule than OB/SS (no symptom demotion),
-# disclosed as such; a verified TT topology (or one derived from RE2/RE3 traces)
-# is future work.
+# Train Ticket. Detection is metrics-only, and we default to running TT **graph-free**
+# — candidates are the injectable application services (all `ts-*-service`, excluding the
+# `ts` aggregate and the `*-mongo`/`*-mysql` datastores), with no dependency edges, so
+# `causal_root` reduces to "loudest multivariate-anomalous app service" (no symptom
+# demotion). We DID derive a real TT call graph from RE2-TT traces (parent->child spans;
+# see scripts/derive_tt_graph.py and TT_DEPS_DERIVED below) and measured symptom demotion
+# with it (scripts/tt_graph_delta.py): it improves RE2-TT AC@1 (0.656 -> 0.689) but
+# *degrades* RE1-TT (0.864 -> 0.800), because two of the five injected roots (ts-order,
+# ts-travel) are mid-tier callers whose downstream dependencies co-elevate and trigger
+# wrong demotions. Graph-free is therefore more robust across TT's injection profile and
+# preserves the RE1 headline; we keep it as the default. The derived topology is validated
+# (architecturally correct) — a measured trade-off, not a free win.
 TT_APP_SERVICES = [
     "ts-admin-basic-info-service", "ts-admin-order-service", "ts-admin-route-service",
     "ts-admin-travel-service", "ts-admin-user-service", "ts-assurance-service",
@@ -77,6 +81,29 @@ TT_APP_SERVICES = [
     "ts-verification-code-service", "ts-voucher-service",
 ]
 TT_DEPS: dict[str, list[str]] = {s: [] for s in TT_APP_SERVICES}
+
+# Verified TT topology derived from RE2-TT traces (caller -> callees; see
+# scripts/derive_tt_graph.py, 20 sampled cases). Architecturally correct but NOT the
+# default: enabling symptom demotion with it degrades the RE1-TT headline (see the note
+# above and scripts/tt_graph_delta.py). Kept for transparency + reproduction of the
+# measured trade-off. Merge over `{s: [] for s in TT_APP_SERVICES}` to score with it.
+TT_DEPS_DERIVED: dict[str, list[str]] = {
+    "ts-basic-service": ["ts-station-service", "ts-train-service", "ts-price-service", "ts-route-service"],
+    "ts-ticketinfo-service": ["ts-basic-service"],
+    "ts-travel2-service": ["ts-ticketinfo-service", "ts-route-service", "ts-train-service", "ts-seat-service", "ts-order-other-service"],
+    "ts-seat-service": ["ts-travel2-service", "ts-config-service", "ts-travel-service", "ts-order-other-service", "ts-order-service"],
+    "ts-travel-service": ["ts-ticketinfo-service", "ts-route-service", "ts-train-service", "ts-seat-service", "ts-order-service"],
+    "ts-food-service": ["ts-food-map-service", "ts-station-service", "ts-travel-service"],
+    "ts-admin-travel-service": ["ts-travel-service", "ts-travel2-service"],
+    "ts-admin-basic-info-service": ["ts-config-service", "ts-price-service"],
+    "ts-preserve-service": ["ts-station-service", "ts-user-service", "ts-order-service", "ts-security-service", "ts-travel-service", "ts-seat-service", "ts-ticketinfo-service", "ts-contacts-service", "ts-food-service", "ts-assurance-service"],
+    "ts-order-service": ["ts-station-service"],
+    "ts-security-service": ["ts-order-service", "ts-order-other-service"],
+    "ts-consign-service": ["ts-consign-price-service"],
+    "ts-inside-payment-service": ["ts-order-service", "ts-order-other-service", "ts-payment-service"],
+    "ts-preserve-other-service": ["ts-station-service", "ts-seat-service", "ts-user-service", "ts-contacts-service", "ts-ticketinfo-service", "ts-security-service", "ts-order-other-service", "ts-travel2-service", "ts-food-service", "ts-assurance-service"],
+    "ts-order-other-service": ["ts-station-service"],
+}
 
 SYSTEM_DEPS = {"OB": OB_DEPS, "SS": SS_DEPS, "TT": TT_DEPS}
 FAULTS = ("cpu", "mem", "disk", "delay", "loss")

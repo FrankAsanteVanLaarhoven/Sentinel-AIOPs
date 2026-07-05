@@ -281,8 +281,9 @@ Top-1 falls to 0.664).
 
 **Train Ticket is run graph-free.** RE1 provides no verified call graph for TT's ~40
 services, so `causal_root` reduces to the loudest multivariate-anomalous app service
-(no symptom demotion) — a *weaker* use of the rule, disclosed as such; a verified TT
-topology (or one derived from RE2/RE3 traces) is future work.
+(no symptom demotion) — a *weaker* use of the rule, disclosed as such. We later derived a
+verified TT topology from RE2-TT traces and measured it: it helps RE2-TT but **degrades this
+RE1-TT number**, so graph-free is retained as the more robust default (§7.2e).
 
 **Reading it.** Across three independent systems the **selective** (multivariate-evidence)
 signal gives Top-1 0.800 / 0.872 / 0.864 (aggregate **0.845**; Top-3 **0.912**) — the same
@@ -376,6 +377,34 @@ still **graph-free** — RE2 ships TT `traces.csv`, from which a real call graph
 to restore symptom demotion; that is the clear next lever (§12). Reproduce:
 `make validate-rcaeval-re2` (Sentinel) and `TIER=RE2 make compare-baselines` (BARO, metric-only).
 
+### 7.2e Deriving a Train Ticket call graph from traces — a measured trade-off
+
+TT runs **graph-free**: with no topology, `causal_root` cannot demote symptoms, so it reports
+the loudest anomalous service (§7.2d). The obvious lever is a real graph. RE2-TT ships per-case
+`traces.csv`; a span's parent service is the caller and its own service the callee, so
+`parent_service → child_service` is a genuine dependency edge. We aggregated these over 20
+sampled RE2-TT cases into a static caller→callees graph (`make derive-tt-graph`). The result is
+**architecturally correct** — e.g. `ts-basic-service → {station, train, price, route}`,
+`ts-inside-payment-service → {order, order-other, payment}` — and every trace service maps to a
+known TT app service (0 unmatched). We then scored TT **with symptom demotion** on this topology
+(`make tt-graph-delta`):
+
+| tier | graph-free AC@1 | derived-graph AC@1 | Δ AC@1 |
+|---|---:|---:|---:|
+| RE1-TT (125) | **0.864** | 0.800 | **−0.064** |
+| RE2-TT (90) | 0.656 | **0.689** | **+0.033** |
+
+**The topology does not uniformly help.** It improves RE2-TT AC@1 (+3.3 pts) but **degrades the
+RE1-TT headline** (−6.4 pts). Both tiers inject the *same five* roots; the difference is
+structural — two of them, `ts-order-service` (1 downstream dep) and `ts-travel-service` (5), are
+**mid-tier callers**. When their real dependencies co-elevate, symptom demotion removes the true
+root; on RE1-TT this costs more than it gains, while on RE2-TT's richer metric channel the
+injected root dominates clearly enough that demotion nets positive. We therefore **retain
+graph-free as the default** (it preserves the RE1 headline and is more robust across TT's
+injection profile) and report the derived topology as **validated-but-not-adopted** — a measured
+trade-off, not a free win. This resolves the earlier "TT is graph-free" caveat by *doing* the
+experiment and quantifying why the loudest-service rule wins here.
+
 ### 7.3 The detection↔localization coupling (the core finding)
 
 Three measured facts, in order:
@@ -466,7 +495,7 @@ The result that most shapes the research program is negative: within-domain dete
 1. **Restore held-out localization precision under broad detection** — per-node PCA reconstruction where dimensionality allows, magnitudes that down-weight ubiquitously-noisy metrics, or a learned within-domain detector — evaluated on the held-out split, not the combined set.
 2. **Calibrated soft-elevation** — feed detector confidence into `causal_root` as a continuous magnitude, decoupling coverage from the binary saturation that hurts precision; the per-detector calibration machinery and measurements now exist (§7.1b).
 3. **Extend the governed hand-off to production** — the `ActionProposal` → VerdictPlane loop (deterministic decision + enforcement behind a real human gate and a tamper-evident ledger) is built and demonstrated (§3.7); remaining work is wiring a *learned* detection signal into the live engine behind that boundary, and real reviewer workflows at scale, so a learned signal can inform but never unilaterally drive action.
-4. **More of RCAEval and heavier baselines** — RE1 (metrics-only) with two baselines, BARO and ε-Diagnosis, is done (§7.2b–c); extend to the **RE2/RE3** tiers (logs + traces) and to the heavier causal baselines (**RCD, CIRCA, MicroCause**) under the same candidate set and splits.
+4. **More of RCAEval and heavier baselines** — RE1 (metrics-only) with two baselines, plus **RE2** metrics-only (framing A, vs metric-only BARO; §7.2d) and a **trace-derived TT call graph** measured as a trade-off (§7.2e), are done. Remaining: **RE3** (code-level faults), a *multi-source* extension that actually consumes logs/traces (the regime where trace methods have the edge — Paper 2), and heavier causal baselines (**RCD, CIRCA, MicroCause**) under the same candidate set and splits.
 5. **A user study of the gate** — measure whether the method/confidence/failure-mode trace changes operator trust and time-to-decision.
 
 ---
