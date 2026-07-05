@@ -23,6 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from sentinel.incident_agent import detect, localize, find_root_cause, investigate, _baseline
 from sentinel.action_proposal import build_action_proposal
+from sentinel.audit_log import AuditLog
 from sentinel.telemetry_sim import SERVICES, DEPS, N, INC, SLO_ERR
 from sentinel.tools import TelemetryTools
 from sentinel.providers import get_provider
@@ -213,15 +214,42 @@ def api_investigate(scenario: str = Query("flag_spike")):
     }
 
 
+# Tamper-evident provenance log of every ActionProposal (path git-ignored;
+# override with SENTINEL_AUDIT_PATH, sign with SENTINEL_AUDIT_KEY).
+_AUDIT = AuditLog(os.environ.get(
+    "SENTINEL_AUDIT_PATH",
+    str(Path(__file__).resolve().parents[3] / "artifacts" / "audit_log.jsonl")))
+
+
 @app.get("/action-proposal")
 def api_action_proposal(scenario: str = Query("flag_spike")):
     """Sentinel's typed hand-off to VerdictPlane. Propose-only / fail-closed /
-    human-gated by construction — Sentinel never sets handoff.executed."""
+    human-gated by construction — Sentinel never sets handoff.executed. Every
+    proposal is recorded to the tamper-evident audit log (see /audit)."""
     scenario = _scn(scenario)
     inv = api_investigate(scenario)
     if not inv.get("detected"):
         return {"detected": False, "method": METHOD}
-    return build_action_proposal(inv, method=METHOD).model_dump()
+    proposal = build_action_proposal(inv, method=METHOD).model_dump(mode="json")
+    _AUDIT.record(proposal)
+    return proposal
+
+
+@app.get("/audit")
+def api_audit(action_id: str | None = Query(None)):
+    """Provenance query. With ?action_id= (proposal_id or replay_id) returns that
+    entry; without, returns the chain summary (length + head hash)."""
+    if action_id:
+        e = _AUDIT.get(action_id)
+        return e or {"found": False, "action_id": action_id}
+    v = _AUDIT.verify()
+    return {"length": v["length"], "head_hash": v.get("head_hash"), "signed": v.get("signed")}
+
+
+@app.get("/audit/verify")
+def api_audit_verify():
+    """Re-walk the hash chain and report integrity (ok / first broken entry)."""
+    return _AUDIT.verify()
 
 
 @app.get("/topology")

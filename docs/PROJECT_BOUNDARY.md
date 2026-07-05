@@ -35,6 +35,9 @@ RCA**.
 - **Emit a typed `ActionProposal`** (`sentinel.action_proposal`) — root, confidence, evidence,
   a typed remediation, and a **fail-closed, human-gated, propose-only** policy — for hand-off
   to **VerdictPlane**.
+- **Record every proposal** to a **tamper-evident, hash-chained, optionally-signed** provenance
+  log (`sentinel.audit_log`, queried at `GET /audit` / `GET /audit/verify`) — replayable by
+  `proposal_id` / `replay_id`, alteration of any past entry is detectable.
 - **Report honestly** — measured numbers only; trade-offs and failure modes disclosed.
 
 ## Does NOT
@@ -63,6 +66,10 @@ Sentinel's output to the rest of the stack is the **`ActionProposal`** (see
 - `handoff.target = "verdictplane"`, `handoff.executed = false` — Sentinel never sets `executed`.
 - `evidence_grounding.ratio` — fraction of diagnosis claims linked to evidence IDs (target ≥ 0.95).
 - `reproducibility.deterministic = true` with a `replay_id` — same incident input ⇒ same proposal.
+- Every proposal is appended to a **hash-chained** provenance log
+  (`entry_hash = sha256(prev_hash + core)`), optionally **HMAC-signed** (`SENTINEL_AUDIT_KEY`);
+  `GET /audit/verify` re-walks the chain and reports the first altered entry. The log stores
+  proposals only — no telemetry, no execution, no policy evaluation.
 
 VerdictPlane consumes an `ActionProposal` and returns a verdict (allow/deny/modify); it, not
 Sentinel, performs or blocks the action.
@@ -82,7 +89,7 @@ diluting the diagnosis core:
 |---|---|---|
 | Observability | **partial** | OTel-native signals; engine is instrumentable |
 | Docs / benchmark repro | **done** | MANUSCRIPT, SENTINEL_PAPER, RCAEVAL, reproducible `make` |
-| Audit | **next** | immutable, signed decision logs of every `ActionProposal` |
+| Audit | **done** | hash-chained, optionally-signed provenance log of every `ActionProposal` (`/audit`, `/audit/verify`); SIEM export next |
 | Reliability | **next** | health checks, retries, fail-closed (already the policy default), rollback via VerdictPlane |
 | Security (SSO/RBAC/tenant) | later | open-core: free local engine, paid enterprise console |
 | Deployment (Helm/Terraform/air-gap) | later | Docker exists; packaging later |

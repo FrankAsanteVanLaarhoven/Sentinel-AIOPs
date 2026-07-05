@@ -45,6 +45,7 @@ The separation buys three things a fused pipeline cannot. (i) **Auditability** �
 - **C3.** An empirical validation of a *training-free* causal-localization rule on the public PetShop corpus (recall@1 0.265 / recall@3 0.471, coverage 0.706), with the rule reused verbatim from the production engine (§7).
 - **C4.** A controlled ablation of the detection↔localization coupling: target vs. broad vs. multivariate-selective elevated signals, reported on both the combined and held-out splits, yielding the measured conclusion that within-domain detection closes the coverage gap but does not restore localization precision on held-out data (§7, §8).
 - **C5.** A reproducible, offline artifact: 18 hermetic tests, `make` targets that regenerate every number, and a documented claim boundary (§6, §9, §11).
+- **C6.** A typed, evidence-linked hand-off contract (`ActionProposal`) that carries a *measured* evidence-grounding ratio and is propose-only / fail-closed / human-gated by construction, together with a tamper-evident, hash-chained, optionally-signed provenance log of every proposal (`GET /audit`, `/audit/verify`) — making the assistive boundary and the diagnosis's provenance auditable in code rather than by assertion (§3).
 
 ---
 
