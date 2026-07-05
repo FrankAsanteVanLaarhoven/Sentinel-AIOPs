@@ -86,6 +86,14 @@ rollback resolves to `require_human` → `requires_approval` (never auto-`allowe
 weak-evidence rollbacks are `denied` (fail-closed). Sentinel keeps no verdict ledger —
 that is VerdictPlane's.
 
+`/handoff` exercises the **decision** path (`evaluate`). The full **enforcement** path is
+demonstrated by `make enforce-demo`: a proposed rollback is run through VerdictPlane's
+`govern()` + hash-chained `Ledger` + file-backed human `Gate`, so the rollback side effect
+*physically cannot run* until a reviewer approves — no reviewer (timeout) or weak evidence
+means it never runs, and every decision is recorded in the tamper-evident ledger. This is
+measured autonomy end-to-end: an action proceeds only when evidence, policy, **and** a human
+all agree.
+
 ## Benchmark harness
 
 `make verify` (synthetic) · `make validate-rca` (PetShop) · `make validate-rcaeval` (RCAEval RE1)

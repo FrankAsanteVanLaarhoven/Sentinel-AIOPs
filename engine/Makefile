@@ -9,6 +9,7 @@ train-metricdet: ; python scripts/train_metric_anomaly.py   # train+eval metric-
 validate-rca:    ; python scripts/validate_localization.py  # score causal localization on the real PetShop corpus
 validate-rcaeval:; python scripts/validate_rcaeval.py       # score causal localization on the RCAEval benchmark (RE1)
 compare-baselines:; python scripts/compare_baselines.py     # Sentinel vs BARO on RE1 (needs RCAEVAL_SRC=cloned repo)
+enforce-demo:    ; python scripts/enforcement_demo.py        # Sentinel rollback under real VerdictPlane enforcement (needs: pip install verdictplane)
 serve:   ; uvicorn sentinel.api.engine_api:app --port 8008 --reload   # the incident engine HTTP API (:8008)
 run:     ; uvicorn sentinel.api.main:app --reload   # instrumented sample service
 incident:; FEATURE_FLAG_NEW_RANKING=1 uvicorn sentinel.api.main:app --port 8000  # reproduce the incident
