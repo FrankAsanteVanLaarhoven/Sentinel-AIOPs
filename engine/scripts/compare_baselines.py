@@ -41,12 +41,15 @@ ART = Path(__file__).resolve().parents[1] / "artifacts"
 TIER = os.environ.get("TIER", "RE1").upper()  # RE1 (metrics-only) or RE2 (multi-source; metric channel only)
 SYS = {c: (f"{TIER}-{c}", ds) for c, ds in
        (("OB", "online-boutique"), ("SS", "sock-shop"), ("TT", "train-ticket"))}
-FAULTSET = FAULTS + (("socket",) if TIER == "RE2" else ())
+FAULTSET = {"RE1": FAULTS, "RE2": FAULTS + ("socket",),
+            "RE3": ("f1", "f2", "f3", "f4", "f5")}.get(TIER, FAULTS)
 # Sentinel's measured numbers (best signal per system, by AC@1): (AC@1, AC@3, Avg@5).
 # RE2 = metrics-only reach on the multi-source tier (framing A); BARO is likewise metric-only here.
 SENTINEL_BY_TIER = {
     "RE1": {"OB": (0.808, 0.936, 0.910), "SS": (0.872, 0.960, 0.947), "TT": (0.864, 0.960, 0.942)},
     "RE2": {"OB": (0.911, 0.978, 0.960), "SS": (0.878, 0.933, 0.916), "TT": (0.656, 0.767, 0.744)},
+    # RE3 = code-level faults; the z>=3 rule is OUTPERFORMED by metric-only BARO here (its envelope).
+    "RE3": {"OB": (0.800, 0.967, 0.920), "SS": (0.233, 0.500, 0.427), "TT": (0.444, 0.667, 0.615)},
 }
 SENTINEL = SENTINEL_BY_TIER[TIER]
 

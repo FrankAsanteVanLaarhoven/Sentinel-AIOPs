@@ -13,10 +13,11 @@ Outputs (git-ignored): artifacts/rcaeval/{RE2,RE3}-*/… corpus + artifacts/rcae
 """
 from __future__ import annotations
 
-import io
 import json
 import os
+import shutil
 import sys
+import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -38,12 +39,26 @@ SYSTEMS = {"OB": f"{TIER}-OB", "SS": f"{TIER}-SS", "TT": f"{TIER}-TT"}
 
 
 def ensure(archive: str) -> str:
+    """Fetch an archive, extracting ONLY the metric + inject files.
+
+    RE2/RE3 zips bundle per-case traces + logs (tens of GB unpacked). This rule is
+    metrics-only, so we stream the zip to a temp file and selectively extract just
+    ``simple_metrics.csv`` / ``data.csv`` / ``inject_time.txt`` — keeping the on-disk
+    corpus tiny and never materialising the trace/log channels we don't use.
+    """
     out = CACHE / archive
     if not out.exists():
-        print(f"downloading {archive}… (multi-source zip — larger than RE1)")
-        data = urllib.request.urlopen(ZENODO.format(name=archive), timeout=600).read()
-        zipfile.ZipFile(io.BytesIO(data)).extractall(out)
-        print(f"  {len(data) / 1e6:.1f} MB")
+        print(f"downloading {archive}… (streaming; extracting metric channel only)")
+        tmp = Path(tempfile.gettempdir()) / f"{archive}.zip"
+        with urllib.request.urlopen(ZENODO.format(name=archive), timeout=900) as r, open(tmp, "wb") as f:
+            shutil.copyfileobj(r, f, length=1 << 20)
+        with zipfile.ZipFile(tmp) as z:
+            keep = [m for m in z.namelist()
+                    if m.endswith(("simple_metrics.csv", "data.csv", "inject_time.txt"))]
+            for m in keep:
+                z.extract(m, out)
+        tmp.unlink(missing_ok=True)
+        print(f"  {tmp.name}: extracted {len(keep)} metric/inject files")
     inner = out / archive
     return str(inner if inner.is_dir() else out)
 
