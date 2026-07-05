@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sentinel.incident_agent import detect, localize, find_root_cause, investigate, _baseline
 from sentinel.action_proposal import build_action_proposal
 from sentinel.audit_log import AuditLog
+from sentinel.verdictplane import submit as vp_submit
 from sentinel.telemetry_sim import SERVICES, DEPS, N, INC, SLO_ERR
 from sentinel.tools import TelemetryTools
 from sentinel.providers import get_provider
@@ -233,6 +234,23 @@ def api_action_proposal(scenario: str = Query("flag_spike")):
     proposal = build_action_proposal(inv, method=METHOD).model_dump(mode="json")
     _AUDIT.record(proposal)
     return proposal
+
+
+@app.get("/handoff")
+def api_handoff(scenario: str = Query("flag_spike")):
+    """Full propose→govern loop: investigate → typed ActionProposal (recorded to the
+    audit log) → submitted to a VerdictPlane governor → returns the Verdict. The
+    default governor is the reference consumer (the authoritative one is VerdictPlane).
+    A well-grounded Sentinel proposal resolves to requires_approval — never auto-allowed."""
+    scenario = _scn(scenario)
+    inv = api_investigate(scenario)
+    if not inv.get("detected"):
+        return {"detected": False, "method": METHOD}
+    proposal = build_action_proposal(inv, method=METHOD).model_dump(mode="json")
+    _AUDIT.record(proposal)
+    verdict = vp_submit(proposal).model_dump()
+    return {"proposal_id": proposal["proposal_id"], "root_service": proposal["root_service"],
+            "proposed_action": proposal["proposed_action"]["type"], "verdict": verdict}
 
 
 @app.get("/audit")
