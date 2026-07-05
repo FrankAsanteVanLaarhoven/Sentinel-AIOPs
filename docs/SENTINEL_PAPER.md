@@ -12,7 +12,7 @@
 
 Modern AIOps systems increasingly localize incident root causes with learned, opaque models whose outputs are then used to drive — or recommend — remediation. Two problems follow: the localization step is hard to audit, and detection error silently contaminates localization. **Sentinel-AIOPs** takes the opposite structural stance. It enforces a strict boundary between a **learned detection layer** (statistical models trained on real public telemetry) and a **deterministic causal-localization core** (`causal_root`, a training-free graph rule that is inspectable and byte-for-byte reproducible), and validates each layer independently on real, labelled public corpora. On held-out HDFS log data the detection layer reaches F1 0.719 (precision 0.992, recall 0.564, ROC-AUC 0.787); on the SMD multivariate-metric corpus it reaches point-wise F1 0.210 (point-adjusted F1 0.35) under a deliberately conservative, train-only threshold; the log detector is already well-calibrated (ECE 0.0009), while the metric detector's reconstruction-error score is not a probability and needs recalibration (ECE 0.139 → 0.0002 via isotonic mapping). On the public PetShop root-cause corpus (68 labelled incidents) the deterministic core — reused verbatim from the live engine — attains recall@1 0.265 / recall@3 0.471 at detection coverage 0.706; and on the standardized public **RCAEval RE1** benchmark (375 metrics-only cases across three microservice systems) the same verbatim rule attains **AC@1 0.845 / Avg@5 0.900** and outperforms **BARO** — reproduced in our harness under its documented configuration — on AC@1 on all three systems, with a classical ε-Diagnosis baseline far behind. We then study the coupling between detection breadth and localization precision as a controlled ablation over the "elevated" signal, and report a measured, held-out-checked result: broadening the detection signal to a node's full metric vector raises coverage to 0.971 but degrades recall@1 to 0.206; requiring multivariate evidence (≥2 metrics) recovers recall@1 to 0.250 on the combined set — yet on the held-out split it does **not** restore precision (recall@1 0.229 vs 0.271; recall@3 dips to 0.396). The tension between detection coverage and localization precision is therefore **mitigable but not eliminated** by within-domain detection alone. Every diagnosis is emitted as a typed, evidence-linked proposal behind a fail-closed, human-gated boundary with a tamper-evident audit trail, and handed to a separate deterministic control plane rather than executed. We scope all claims tightly: no cross-domain transfer is asserted, no simulation result is presented as production evidence, and no oracle-dependent metric is used for a deployable claim.
 
-**Keywords.** AIOps, root cause analysis, log anomaly detection, multivariate time-series anomaly detection, causal localization, human-in-the-loop, observability, reproducibility.
+**Keywords.** AIOps, root cause analysis, log anomaly detection, multivariate time-series anomaly detection, causal localization, calibration, action governance, human-in-the-loop, observability, reproducibility.
 
 ---
 
@@ -187,7 +187,7 @@ For each metric: **name · formula/definition · what it measures · why it matt
 
 **Corpora and splits.**
 - **HDFS logs** (`logfit-project/HDFS_v1`; origin Xu et al., 2009): per-block sessions; the reported run uses one parquet shard — 108,000 sessions, of which **32,415 held out**, anomaly rate **4.95%**. Split is on sessions; features/threshold fit on train only.
-- **SMD** (Server Machine Dataset; Su et al., 2019): **28 machines** (all), pooled to **708,000 points**, anomaly rate **4.2%**. Threshold from the **train** reconstruction-error distribution.
+- **SMD** (Server Machine Dataset; Su et al., 2019): **28 machines** (all), pooled to **708,420 points**, anomaly rate **4.2%**. Threshold from the **train** reconstruction-error distribution.
 - **PetShop** (`amazon-science/petshop-root-cause-analysis`; Hardt et al., 2024): **4 scenarios** (`low_traffic`, `high_traffic`, `temporal_traffic1`, `temporal_traffic2`), **68 labelled incidents** across train+test; **held-out test split = 48**. Baseline built from each scenario's `noissue` window.
 - **Synthetic** localization: **5 hand-authored scenarios** with known ground-truth roots (`make verify`).
 
@@ -448,7 +448,7 @@ The result that most shapes the research program is negative: within-domain dete
 
 - **Paper 1 (this work) — The inspectable core.** A deterministic, verbatim-reused localization rule, its empirical validation on a real corpus, and the measured detection↔localization coupling. *Contribution:* a reproducible, auditable baseline and the trade-off as a first-class object.
 - **Paper 2 — Calibrated detection for accountable localization.** A learned, well-calibrated detector whose confidence is consumed as a soft elevated-magnitude, co-optimizing coverage and localization precision on held-out data; a proper detector comparison and threshold study. *Contribution:* moving the frontier §10 identifies without sacrificing auditability.
-- **Paper 3 — Human-gated, governed remediation.** Closing the loop from diagnosis to a *proposed* remediation under an explicit approval gate and an in-path governance/rollback layer, with a user study of trust. *Contribution:* accountable automation end-to-end.
+- **Paper 3 — Human-gated, governed remediation.** Closing the loop from diagnosis to a *proposed* remediation under an explicit approval gate and an in-path governance/rollback layer, with a user study of trust. A first increment already exists — the typed `ActionProposal` → VerdictPlane hand-off with a tamper-evident audit log and a blocking human gate (§3.7, C6); Paper 3 adds the learned-signal integration and the user study. *Contribution:* accountable automation end-to-end.
 
 Through-line: **the reasoning that must be trusted stays inspectable; learning is confined to the signal that feeds it, and every claim is measured on held-out data.**
 
@@ -475,7 +475,7 @@ Through-line: **the reasoning that must be trusted stays inspectable; learning i
 
 ## 15. Reproducibility
 
-- **Commands:** §6. **Evidence:** committed model cards behind `GET /validation`, `/log-anomaly`, `/metric-anomaly`, `/rca-validation`; git-ignored corpora/weights/cards regenerated via the `make` targets.
+- **Commands:** §6. **Evidence:** committed model cards behind `GET /validation`, `/log-anomaly`, `/metric-anomaly`, `/rca-validation`, `/rcaeval`, and the governed hand-off at `/action-proposal`, `/handoff`, `/audit` (+ `/audit/verify`); git-ignored corpora/weights/cards regenerated via the `make` targets.
 - **Tests:** 44 hermetic, offline (incident agent; log + metric detectors; calibration metrics; RCA harness incl. within-domain broad and selective; RCAEval adapter; ActionProposal / audit log / VerdictPlane hand-off / enforcement).
 - **Determinism:** `causal_root` is pure and byte-identical across engine and harness.
 
