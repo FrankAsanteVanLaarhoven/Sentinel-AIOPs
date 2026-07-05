@@ -1,0 +1,25 @@
+# Default hand-off policy for Sentinel -> VerdictPlane.
+#
+# Evaluated by VerdictPlane's deterministic engine (verdictplane.evaluate); first-match
+# wins, anything unmatched falls to the safe default. This ships as a sensible default so
+# the loop is testable offline; in production the OPERATOR supplies the authoritative
+# policy (point Sentinel at it with VERDICTPLANE_POLICY). Policy is a governance artifact —
+# Sentinel provides the action and delegates the decision; it does not evaluate policy itself.
+
+default: require_human
+
+rules:
+  # Recording an assistive proposal is safe and always audited.
+  - match: { effect: propose }
+    decision: allow
+
+  # Fail-closed: never execute a remediation on weak evidence — deterministic deny,
+  # no human needed. (Mirrors "measured autonomy": act only when evidence agrees.)
+  - match: { tool: incident.rollback, args.grounding: { lt: 0.95 } }
+    decision: deny
+  - match: { tool: incident.rollback, args.confidence: { lt: 0.5 } }
+    decision: deny
+
+  # A well-grounded remediation is a real side effect: a human must approve.
+  - match: { tool: incident.rollback }
+    decision: require_human

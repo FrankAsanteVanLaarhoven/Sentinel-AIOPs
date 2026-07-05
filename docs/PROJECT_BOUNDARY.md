@@ -74,12 +74,17 @@ Sentinel's output to the rest of the stack is the **`ActionProposal`** (see
 VerdictPlane consumes an `ActionProposal` and returns a typed **`Verdict`**
 (`allowed` / `denied` / `requires_approval`, referencing the `proposal_id`); it, not
 Sentinel, performs or blocks the action. `GET /handoff` runs the full loop
-(investigate → propose → record → govern) against a **reference governor** — a minimal
-deterministic stand-in for contract validation; the authoritative governor is the
-VerdictPlane project. Because Sentinel proposals are always human-gated, a well-grounded
-proposal resolves to `requires_approval` (never auto-`allowed`); poorly-grounded or
-low-confidence proposals are `denied`. Sentinel keeps no verdict ledger — that is
-VerdictPlane's.
+(investigate → propose → record → govern) and, when the `verdictplane` package is
+installed, delegates to the **real VerdictPlane engine in-process** — `verdictplane.evaluate`,
+which is *in-path and zero-egress* (no network call, by VerdictPlane's design). Sentinel
+maps the proposal to a VerdictPlane `Action` and supplies a policy document
+(`engine/policies/verdictplane_handoff.yaml`, operator-overridable via `VERDICTPLANE_POLICY`);
+**VerdictPlane owns the decision** — Sentinel does not evaluate policy. A minimal
+`reference_governor` is the offline fallback for contract validation; `Verdict.governor`
+records which decided. Because Sentinel proposals are always human-gated, a well-grounded
+rollback resolves to `require_human` → `requires_approval` (never auto-`allowed`);
+weak-evidence rollbacks are `denied` (fail-closed). Sentinel keeps no verdict ledger —
+that is VerdictPlane's.
 
 ## Benchmark harness
 
