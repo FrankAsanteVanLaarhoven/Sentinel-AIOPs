@@ -83,6 +83,11 @@ std-floor + multivariate evidence suppress. **Caveats:** reproduced numbers (not
 published RE1 table); `dk_select_useful=True` was inapplicable (column-format mismatch →
 0.000); **RE1 is metrics-only** and BARO is reportedly stronger on the richer RE2 tier
 (not compared); this is one of 15 baselines (others need heavier deps — future work).
+**Second baseline (classical):** ε-Diagnosis (Shan et al. 2019, via PyRCA, α=0.01) in the
+same harness scored AC@1 0.056 (OB) / 0.000 (SS) — far below BARO and Sentinel (TT omitted:
+its pairwise-correlation step is prohibitively slow at ~40-service scale). Confirms the
+advantage generalizes across baselines. ε-Diagnosis is optional: `pip install --no-deps sfr-pyrca dill`.
+
 Reproduce: `git clone https://github.com/phamquiluan/RCAEval && RCAEVAL_SRC=… make compare-baselines`.
 
 ## Scope and boundary (what is / is not claimed)

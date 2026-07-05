@@ -1,12 +1,17 @@
-"""Apples-to-apples baseline comparison on RCAEval RE1: Sentinel vs BARO.
+"""Apples-to-apples baseline comparison on RCAEval RE1: Sentinel vs BARO and ε-Diagnosis.
 
-Runs BARO (Pham et al.'s RobustScorer, from the RCAEval repo) over the *same*
-RE1 cases, under the *same* candidate set and the *same* service-level AC@k as
-Sentinel, so the only thing that differs is the ranking algorithm.
+Runs each baseline (from the RCAEval repo) over the *same* RE1 cases, under the
+*same* candidate set and the *same* service-level AC@k as Sentinel, so the only
+thing that differs is the ranking algorithm.
 
-Setup (BARO's real code is not on PyPI as a usable wheel — clone the repo):
+Setup (the baselines' real code is not on PyPI as a usable wheel — clone the repo):
     git clone --depth 1 https://github.com/phamquiluan/RCAEval /path/to/RCAEval
     RCAEVAL_SRC=/path/to/RCAEval make compare-baselines   # or run this script
+
+BARO needs only numpy/pandas/scikit-learn (already required). ε-Diagnosis is
+OPTIONAL and uses Salesforce PyRCA — install it *without* its over-pinned deps
+(it works with modern sklearn): `pip install --no-deps sfr-pyrca dill`. If PyRCA
+is absent the script runs BARO alone.
 
 BARO is invoked in RCAEval's **documented** config (`dk_select_useful=False`,
 the setting `main.py` uses; `dk_select_useful=True` is tuned to RCAEval's internal
@@ -49,6 +54,30 @@ def _load_baro():
     return mod.baro
 
 
+def _load_ediag(src):
+    """ε-Diagnosis via Salesforce PyRCA, replicating RCAEval's e_diagnosis wrapper.
+    Optional: install with `pip install --no-deps sfr-pyrca dill`. Returns None if
+    unavailable so the script still runs BARO alone."""
+    try:
+        from pyrca.analyzers.epsilon_diagnosis import EpsilonDiagnosis
+        sys.path.insert(0, src)
+        from RCAEval.io.time_series import preprocess
+    except Exception:
+        return None
+
+    def ediag(data, inject_time, dataset, alpha=0.01):
+        m = EpsilonDiagnosis(config=EpsilonDiagnosis.config_class(alpha=alpha))
+        nd = preprocess(data[data["time"] < inject_time], dataset=dataset, dk_select_useful=False)
+        ad = preprocess(data[data["time"] >= inject_time], dataset=dataset, dk_select_useful=False)
+        cols = [c for c in nd.columns if c in ad.columns]
+        nd, ad = nd[cols], ad[cols]
+        L = min(len(nd), len(ad))
+        m.train(nd.tail(L))
+        res = m.find_root_causes(ad.head(L)).to_dict()["root_cause_nodes"]
+        return {"ranks": [x[0] for x in sorted(res, key=lambda x: x[1], reverse=True)]}
+    return ediag
+
+
 def _dedup(seq):
     out = []
     for x in seq:
@@ -57,7 +86,9 @@ def _dedup(seq):
     return out
 
 
-def baro_scores(baro, code: str):
+def score_method(run, code: str):
+    """`run(df, inject_time, dataset) -> ranked column names`. Maps columns to
+    services, restricts to the same candidate set as Sentinel, dedups, scores AC@k."""
     arch, ds = SYS[code]
     root = ART / "rcaeval" / arch / arch
     deps = SYSTEM_DEPS[code]
@@ -75,8 +106,11 @@ def baro_scores(baro, code: str):
             if not (csv.is_file() and itf.is_file()):
                 continue
             it = int(itf.read_text().strip())
-            r = baro(pd.read_csv(csv), inject_time=it, dataset=ds, dk_select_useful=False)
-            ranks = [s for s in _dedup([c.rsplit("_", 1)[0] for c in r["ranks"]]) if s in deps]
+            try:
+                cols = run(pd.read_csv(csv), it, ds)
+            except Exception:
+                cols = []
+            ranks = [s for s in _dedup([c.rsplit("_", 1)[0] for c in cols]) if s in deps]
             n += 1
             for k in range(1, 6):
                 if truth in ranks[:k]:
@@ -87,17 +121,24 @@ def baro_scores(baro, code: str):
 
 
 def main() -> int:
+    src = os.environ.get("RCAEVAL_SRC", "")
     baro = _load_baro()
-    print("RCAEval RE1 baseline comparison — Sentinel (causal_root) vs BARO (reproduced, dk=False)\n")
-    print(f"{'sys':4}{'BARO AC@1':>10}{'BARO Avg@5':>11}   {'Sentinel AC@1':>14}{'Sentinel Avg@5':>15}")
-    card = {"benchmark": "RCAEval RE1", "baseline": "BARO (RobustScorer), reproduced in our harness, RCAEval's documented config (dk_select_useful=False)",
-            "note": "Same cases, same candidate set, same service-level AC@k. Reproduced numbers, not BARO's published RE1 table (unavailable). BARO is stronger on richer RE2 telemetry (not compared here).",
+    ediag = _load_ediag(src)
+    baro_run = lambda df, it, ds: baro(df, inject_time=it, dataset=ds, dk_select_useful=False)["ranks"]
+    print("RCAEval RE1 baseline comparison — Sentinel (causal_root) vs baselines (reproduced, dk=False)")
+    print(f"ε-Diagnosis: {'available' if ediag else 'SKIPPED (pip install --no-deps sfr-pyrca dill)'}\n")
+    print(f"{'sys':4}{'BARO AC@1':>10}{'ε-Diag AC@1':>12}{'Sentinel AC@1':>15}")
+    card = {"benchmark": "RCAEval RE1",
+            "note": "Baselines reproduced in our harness — same cases, same candidate set, same service-level AC@k, RCAEval's documented config (dk_select_useful=False). Not the baselines' published RE1 tables. RE1 is metrics-only; BARO is stronger on richer RE2 (not compared).",
             "systems": {}}
     for code in ("OB", "SS", "TT"):
-        b = baro_scores(baro, code)
         s1, s3, s5 = SENTINEL[code]
-        card["systems"][code] = {"baro": b, "sentinel": {"ac_1": s1, "ac_3": s3, "avg_5": s5}}
-        print(f"{code:4}{b['ac_1']:>10.3f}{b['avg_5']:>11.3f}   {s1:>14.3f}{s5:>15.3f}")
+        row = {"baro": score_method(baro_run, code), "sentinel": {"ac_1": s1, "ac_3": s3, "avg_5": s5}}
+        if ediag:
+            row["e_diagnosis"] = score_method(lambda df, it, ds: ediag(df, it, ds)["ranks"], code)
+        card["systems"][code] = row
+        e1 = row.get("e_diagnosis", {}).get("ac_1")
+        print(f"{code:4}{row['baro']['ac_1']:>10.3f}{(f'{e1:.3f}' if e1 is not None else '—'):>12}{s1:>15.3f}")
     ART.mkdir(exist_ok=True)
     (ART / "baseline_comparison.json").write_text(json.dumps(card, indent=2))
     print("\ncard -> artifacts/baseline_comparison.json")

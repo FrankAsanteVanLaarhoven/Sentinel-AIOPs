@@ -315,6 +315,17 @@ compared here. (iv) This is **one** of RCAEval's 15 baselines; several others (R
 edge needs the *broad* signal (0.910); the selective signal's Avg@5 (0.811) trails BARO
 (0.885) because of its lower coverage — the §7.3 trade-off, disclosed.
 
+**Second baseline (classical).** As a sanity check against an older method, ε-Diagnosis
+(Shan et al., 2019, via Salesforce PyRCA's `EpsilonDiagnosis`, RCAEval's default α=0.01),
+run in the *same* harness, scored **AC@1 0.056 / Avg@5 0.197 on Online Boutique** and
+**AC@1 0.000 on Sock Shop** — far below both BARO and Sentinel. Its thresholded
+significant-metric output rarely surfaces the ground-truth application service on these
+high-dimensional systems (Train Ticket omitted — `EpsilonDiagnosis`'s pairwise-correlation
+step is prohibitively slow at ~40-service scale). This is consistent with ε-Diagnosis's
+known weakness on rich metric data and confirms Sentinel's advantage is not specific to a
+single baseline. Reproduce both via `make compare-baselines` (ε-Diagnosis is optional:
+`pip install --no-deps sfr-pyrca dill`).
+
 ### 7.3 The detection↔localization coupling (the core finding)
 
 Three measured facts, in order:
