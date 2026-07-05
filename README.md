@@ -44,7 +44,8 @@ running any pipeline.
 | Detection (learned) | Metric detector | SMD | **F1 0.210** / PA-F1 0.35 *(conservative train-only threshold)* |
 | Localization (deterministic) | `causal_root` | synthetic | **5/5** ground-truth agreement |
 | Validation (empirical) | `causal_root` | PetShop | **recall@1 0.265** / recall@3 0.471 · coverage 0.706 (→ 0.971 within-domain) |
-| Benchmark (standardized) | `causal_root` | RCAEval RE1 (OB+SS+TT) | **AC@1 0.845** / AC@3 0.912 / **Avg@5 0.900** across **375 cases**; beats reproduced **BARO** on AC@1 on all 3 systems (OB 0.81 vs 0.72 · SS 0.87 vs 0.50 · TT 0.86 vs 0.22) *(RE2/RE3 next)* |
+| Benchmark (standardized) | `causal_root` | RCAEval RE1 (OB+SS+TT) | **AC@1 0.845** / AC@3 0.912 / **Avg@5 0.900** across **375 cases**; beats reproduced **BARO** on AC@1 on all 3 systems (OB 0.81 vs 0.72 · SS 0.87 vs 0.50 · TT 0.86 vs 0.22) |
+| Benchmark (multi-source) | `causal_root` *(metrics-only)* | RCAEval RE2 (OB+SS+TT) | **AC@1 0.815** / **Avg@5 0.873** across **270 cases** — *framing A: metric channel only*; beats metric-only **BARO** on AC@1 on all 3 (OB 0.91 vs 0.78 · SS 0.88 vs 0.81 · TT 0.66 vs 0.59); TT is graph-free → deriving a call graph from RE2 traces is the next lever *(RE3 next)* |
 
 No invented numbers; no cross-domain transfer is claimed (the detectors are standalone real-data capabilities).
 The within-domain result closes the coverage gap **but** costs localization precision — reported as a

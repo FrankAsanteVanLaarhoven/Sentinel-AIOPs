@@ -142,12 +142,15 @@ def evaluate_system(
     system: str = "OB",
     signal: str = "within_domain_selective",
     z_thr: float = Z_DEFAULT,
+    faults: tuple = FAULTS,
 ) -> BenchEval:
-    """Run the verbatim causal rule over every RE1 case in ``system_dir``.
+    """Run the verbatim causal rule over every case in ``system_dir``.
 
     ``signal`` selects the (reused) elevated signal: ``"within_domain"`` (>=1
     metric) or ``"within_domain_selective"`` (>=2 metrics). The ranking rule is
-    identical to PetShop and the live engine.
+    identical to PetShop and the live engine. ``faults`` is the accepted fault-type
+    set — RE1's five by default; RE2 adds ``socket`` and RE3 uses ``f1..f5`` — and
+    only affects which case directories are scored (never the metrics-only rule).
     """
     deps = SYSTEM_DEPS[system]
     min_metrics = 2 if signal == "within_domain_selective" else 1
@@ -157,11 +160,13 @@ def evaluate_system(
         if case.startswith(".") or not os.path.isdir(cdir) or "_" not in case:
             continue
         truth, fault = case.rsplit("_", 1)
-        if fault not in FAULTS:
+        if fault not in faults:
             continue
         for inst in sorted(os.listdir(cdir)):
             idir = os.path.join(cdir, inst)
-            csv = os.path.join(idir, "data.csv")
+            csv = os.path.join(idir, "data.csv")  # RE1 name
+            if not os.path.isfile(csv):
+                csv = os.path.join(idir, "simple_metrics.csv")  # RE2/RE3 metrics file
             itf = os.path.join(idir, "inject_time.txt")
             if not (os.path.isfile(csv) and os.path.isfile(itf)):
                 continue

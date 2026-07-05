@@ -8,7 +8,8 @@ train-logdet:    ; python scripts/train_log_anomaly.py      # train+eval log-ano
 train-metricdet: ; python scripts/train_metric_anomaly.py   # train+eval metric-anomaly on real SMD (MACHINES=…)
 validate-rca:    ; python scripts/validate_localization.py  # score causal localization on the real PetShop corpus
 validate-rcaeval:; python scripts/validate_rcaeval.py       # score causal localization on the RCAEval benchmark (RE1)
-compare-baselines:; python scripts/compare_baselines.py     # Sentinel vs BARO on RE1 (needs RCAEVAL_SRC=cloned repo)
+validate-rcaeval-re2:; TIER=RE2 python scripts/validate_rcaeval_multi.py  # metrics-only causal_root on RE2/RE3 (framing A; TIER=RE3 for RE3)
+compare-baselines:; python scripts/compare_baselines.py     # Sentinel vs BARO on RE1 (TIER=RE2 for RE2 metric-only; needs RCAEVAL_SRC)
 enforce-demo:    ; python scripts/enforcement_demo.py        # Sentinel rollback under real VerdictPlane enforcement (needs: pip install verdictplane)
 export-audit:    ; python scripts/export_audit.py --format ecs   # SIEM export of the audit log (ECS; use --format cef for ArcSight)
 serve:   ; uvicorn sentinel.api.engine_api:app --port 8008 --reload   # the incident engine HTTP API (:8008)

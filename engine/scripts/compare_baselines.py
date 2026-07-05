@@ -38,9 +38,17 @@ import pandas as pd  # noqa: E402
 from sentinel.rca_rcaeval import SYSTEM_DEPS, FAULTS  # noqa: E402
 
 ART = Path(__file__).resolve().parents[1] / "artifacts"
-SYS = {"OB": ("RE1-OB", "online-boutique"), "SS": ("RE1-SS", "sock-shop"), "TT": ("RE1-TT", "train-ticket")}
-# Sentinel's measured RE1 numbers (best signal per system): (AC@1, AC@3, Avg@5)
-SENTINEL = {"OB": (0.808, 0.936, 0.910), "SS": (0.872, 0.960, 0.947), "TT": (0.864, 0.960, 0.942)}
+TIER = os.environ.get("TIER", "RE1").upper()  # RE1 (metrics-only) or RE2 (multi-source; metric channel only)
+SYS = {c: (f"{TIER}-{c}", ds) for c, ds in
+       (("OB", "online-boutique"), ("SS", "sock-shop"), ("TT", "train-ticket"))}
+FAULTSET = FAULTS + (("socket",) if TIER == "RE2" else ())
+# Sentinel's measured numbers (best signal per system, by AC@1): (AC@1, AC@3, Avg@5).
+# RE2 = metrics-only reach on the multi-source tier (framing A); BARO is likewise metric-only here.
+SENTINEL_BY_TIER = {
+    "RE1": {"OB": (0.808, 0.936, 0.910), "SS": (0.872, 0.960, 0.947), "TT": (0.864, 0.960, 0.942)},
+    "RE2": {"OB": (0.911, 0.978, 0.960), "SS": (0.878, 0.933, 0.916), "TT": (0.656, 0.767, 0.744)},
+}
+SENTINEL = SENTINEL_BY_TIER[TIER]
 
 
 def _load_baro():
@@ -99,10 +107,12 @@ def score_method(run, code: str):
         if "_" not in case or not cdir.is_dir():
             continue
         truth, fault = case.rsplit("_", 1)
-        if fault not in FAULTS:
+        if fault not in FAULTSET:
             continue
         for inst in sorted(os.listdir(cdir)):
             csv, itf = cdir / inst / "data.csv", cdir / inst / "inject_time.txt"
+            if not csv.is_file():
+                csv = cdir / inst / "simple_metrics.csv"  # RE2/RE3 metrics file
             if not (csv.is_file() and itf.is_file()):
                 continue
             it = int(itf.read_text().strip())
@@ -125,11 +135,15 @@ def main() -> int:
     baro = _load_baro()
     ediag = _load_ediag(src)
     baro_run = lambda df, it, ds: baro(df, inject_time=it, dataset=ds, dk_select_useful=False)["ranks"]
-    print("RCAEval RE1 baseline comparison — Sentinel (causal_root) vs baselines (reproduced, dk=False)")
+    print(f"RCAEval {TIER} baseline comparison — Sentinel (causal_root) vs baselines (reproduced, dk=False)")
+    if TIER == "RE2":
+        print("Framing A: metric channel only (simple_metrics.csv) for BOTH — not multi-source BARO.")
     print(f"ε-Diagnosis: {'available' if ediag else 'SKIPPED (pip install --no-deps sfr-pyrca dill)'}\n")
     print(f"{'sys':4}{'BARO AC@1':>10}{'ε-Diag AC@1':>12}{'Sentinel AC@1':>15}")
-    card = {"benchmark": "RCAEval RE1",
-            "note": "Baselines reproduced in our harness — same cases, same candidate set, same service-level AC@k, RCAEval's documented config (dk_select_useful=False). Not the baselines' published RE1 tables. RE1 is metrics-only; BARO is stronger on richer RE2 (not compared).",
+    card = {"benchmark": f"RCAEval {TIER}",
+            "note": ("Baselines reproduced in our harness — same cases, same candidate set, same service-level "
+                     "AC@k, RCAEval's documented config (dk_select_useful=False). Not the baselines' published "
+                     "tables. On RE2 both sides use ONLY the metric channel (framing A) — not multi-source BARO."),
             "systems": {}}
     for code in ("OB", "SS", "TT"):
         s1, s3, s5 = SENTINEL[code]

@@ -350,6 +350,32 @@ known weakness on rich metric data and confirms Sentinel's advantage is not spec
 single baseline. Reproduce both via `make compare-baselines` (ε-Diagnosis is optional:
 `pip install --no-deps sfr-pyrca dill`).
 
+### 7.2d RE2 (multi-source tier) — how far metrics-only reaches (framing A, measured)
+
+RE2 (270 cases, 90/system) adds **logs + traces** and a **socket** fault that multi-source
+RCA methods exploit. We run the **same** verbatim `causal_root` on RE2's **metric channel
+only** (`simple_metrics.csv`), unchanged, and — to stay **signal-fair** — compare only
+against **BARO in a metric-only configuration** (never *multi-source* BARO). This measures
+how far a metrics-only inspectable rule reaches on the harder tier; it is **not** a claim
+against methods that use logs/traces.
+
+| system | Sentinel AC@1 | BARO AC@1 | Sentinel Avg@5 | BARO Avg@5 |
+|---|---:|---:|---:|---:|
+| Online Boutique | **0.911** | 0.778 | **0.960** | 0.936 |
+| Sock Shop | **0.878** | 0.811 | 0.916 | **0.936** |
+| Train Ticket *(graph-free)* | **0.656** | 0.589 | 0.744 | 0.740 |
+| **aggregate (270)** | **0.815** | 0.726 | **0.873** | 0.871 |
+
+**Reading it.** Metrics-only Sentinel **beats metric-only BARO on AC@1 on all three systems**
+(aggregate 0.815 vs 0.726) and edges it on Avg@5 (0.873 vs 0.871: OB ahead, SS slightly
+behind, TT tied) — the AC@1 advantage from RE1 holds on the harder tier. **Two boundaries,
+stated plainly:** (i) both sides here use **only** the metric channel; we make **no** claim
+against trace/log/multi-source methods, which see signal we discard. (ii) **Train Ticket is
+the weak spot** (AC@1 0.656, well below OB/SS and below its own RE1 number) because it is
+still **graph-free** — RE2 ships TT `traces.csv`, from which a real call graph can be derived
+to restore symptom demotion; that is the clear next lever (§12). Reproduce:
+`make validate-rcaeval-re2` (Sentinel) and `TIER=RE2 make compare-baselines` (BARO, metric-only).
+
 ### 7.3 The detection↔localization coupling (the core finding)
 
 Three measured facts, in order:
@@ -368,6 +394,7 @@ Three measured facts, in order:
 | Localization (deterministic) | `causal_root` | synthetic | 5/5 |
 | Localization (deterministic) | `causal_root` | PetShop | recall@1 0.265 / recall@3 0.471, coverage 0.706 |
 | Localization (deterministic) | `causal_root` | RCAEval RE1 | AC@1 0.845 / Avg@5 0.900 (375 cases); beats reproduced BARO on AC@1 |
+| Localization (deterministic) | `causal_root` (metrics-only) | RCAEval RE2 | AC@1 0.815 / Avg@5 0.873 (270 cases); beats metric-only BARO on AC@1 (framing A) |
 | System | full suite | — | 44/44 hermetic tests |
 
 ---
