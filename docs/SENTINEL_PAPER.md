@@ -10,7 +10,7 @@
 
 ## Abstract
 
-Modern AIOps systems increasingly localize incident root causes with learned, opaque models whose outputs are then used to drive — or recommend — remediation. Two problems follow: the localization step is hard to audit, and detection error silently contaminates localization. **Sentinel-AIOPs** takes the opposite structural stance. It enforces a strict boundary between a **learned detection layer** (statistical models trained on real public telemetry) and a **deterministic causal-localization core** (`causal_root`, a training-free graph rule that is inspectable and byte-for-byte reproducible), and validates each layer independently on real, labelled public corpora. On held-out HDFS log data the detection layer reaches F1 0.719 (precision 0.992, recall 0.564, ROC-AUC 0.787); on the SMD multivariate-metric corpus it reaches point-wise F1 0.210 (point-adjusted F1 0.35) under a deliberately conservative, train-only threshold. On the public PetShop root-cause corpus (68 labelled incidents) the deterministic core — reused verbatim from the live engine — attains recall@1 0.265 / recall@3 0.471 at detection coverage 0.706. We then study the coupling between detection breadth and localization precision as a controlled ablation over the "elevated" signal, and report a measured, held-out-checked result: broadening the detection signal to a node's full metric vector raises coverage to 0.971 but degrades recall@1 to 0.206; requiring multivariate evidence (≥2 metrics) recovers recall@1 to 0.250 on the combined set — yet on the held-out split it does **not** restore precision (recall@1 0.229 vs 0.271; recall@3 dips to 0.396). The tension between detection coverage and localization precision is therefore **mitigable but not eliminated** by within-domain detection alone. We scope all claims tightly: no cross-domain transfer is asserted, no simulation result is presented as production evidence, and no oracle-dependent metric is used for a deployable claim.
+Modern AIOps systems increasingly localize incident root causes with learned, opaque models whose outputs are then used to drive — or recommend — remediation. Two problems follow: the localization step is hard to audit, and detection error silently contaminates localization. **Sentinel-AIOPs** takes the opposite structural stance. It enforces a strict boundary between a **learned detection layer** (statistical models trained on real public telemetry) and a **deterministic causal-localization core** (`causal_root`, a training-free graph rule that is inspectable and byte-for-byte reproducible), and validates each layer independently on real, labelled public corpora. On held-out HDFS log data the detection layer reaches F1 0.719 (precision 0.992, recall 0.564, ROC-AUC 0.787); on the SMD multivariate-metric corpus it reaches point-wise F1 0.210 (point-adjusted F1 0.35) under a deliberately conservative, train-only threshold; the log detector is already well-calibrated (ECE 0.0009), while the metric detector's reconstruction-error score is not a probability and needs recalibration (ECE 0.139 → 0.0002 via isotonic mapping). On the public PetShop root-cause corpus (68 labelled incidents) the deterministic core — reused verbatim from the live engine — attains recall@1 0.265 / recall@3 0.471 at detection coverage 0.706; and on the standardized public **RCAEval RE1** benchmark (375 metrics-only cases across three microservice systems) the same verbatim rule attains **AC@1 0.845 / Avg@5 0.900** and outperforms **BARO** — reproduced in our harness under its documented configuration — on AC@1 on all three systems, with a classical ε-Diagnosis baseline far behind. We then study the coupling between detection breadth and localization precision as a controlled ablation over the "elevated" signal, and report a measured, held-out-checked result: broadening the detection signal to a node's full metric vector raises coverage to 0.971 but degrades recall@1 to 0.206; requiring multivariate evidence (≥2 metrics) recovers recall@1 to 0.250 on the combined set — yet on the held-out split it does **not** restore precision (recall@1 0.229 vs 0.271; recall@3 dips to 0.396). The tension between detection coverage and localization precision is therefore **mitigable but not eliminated** by within-domain detection alone. Every diagnosis is emitted as a typed, evidence-linked proposal behind a fail-closed, human-gated boundary with a tamper-evident audit trail, and handed to a separate deterministic control plane rather than executed. We scope all claims tightly: no cross-domain transfer is asserted, no simulation result is presented as production evidence, and no oracle-dependent metric is used for a deployable claim.
 
 **Keywords.** AIOps, root cause analysis, log anomaly detection, multivariate time-series anomaly detection, causal localization, human-in-the-loop, observability, reproducibility.
 
@@ -42,7 +42,7 @@ The separation buys three things a fused pipeline cannot. (i) **Auditability** �
 
 - **C1.** A three-layer AIOps architecture with an enforced learned/deterministic boundary and a single queryable interface (`GET /validation`) that surfaces all three layers' provenance from committed cards without running any pipeline (§3, §11).
 - **C2.** Independent, held-out measurements of two learned detectors on real public corpora — HDFS logs (F1 0.719; already **well-calibrated**: ECE 0.0009, isotonic recalibration measured to be unnecessary) and SMD metrics (F1 0.210 / PA-F1 0.35; raw reconstruction-error pseudo-probability **miscalibrated** at ECE 0.139 but isotonic-**recalibrated** to ECE 0.0002) — a single calibration method yielding two opposite, honest outcomes, with the point-adjust caveat treated as an oracle-leakage boundary, not a headline (§4, §7, §7.1b).
-- **C3.** An empirical validation of a *training-free* causal-localization rule on the public PetShop corpus (recall@1 0.265 / recall@3 0.471, coverage 0.706), with the rule reused verbatim from the production engine (§7).
+- **C3.** An empirical validation of the *training-free* `causal_root` rule — reused verbatim from the production engine — on two public corpora: PetShop (recall@1 0.265 / recall@3 0.471, coverage 0.706) and the standardized **RCAEval RE1** benchmark (375 metrics-only cases across three microservice systems: **AC@1 0.845 / Avg@5 0.900**), where it **outperforms BARO** — reproduced in our harness under its documented config — on AC@1 on all three systems, and a classical ε-Diagnosis baseline by a wide margin (§7.2, §7.2b, §7.2c).
 - **C4.** A controlled ablation of the detection↔localization coupling: target vs. broad vs. multivariate-selective elevated signals, reported on both the combined and held-out splits, yielding the measured conclusion that within-domain detection closes the coverage gap but does not restore localization precision on held-out data (§7, §8).
 - **C5.** A reproducible, offline artifact: 44 hermetic tests, `make` targets that regenerate every number, and a documented claim boundary (§6, §9, §11).
 - **C6.** A typed, evidence-linked hand-off contract (`ActionProposal`) that carries a *measured* evidence-grounding ratio and is propose-only / fail-closed / human-gated by construction, together with a tamper-evident, hash-chained, optionally-signed provenance log of every proposal (`GET /audit`, `/audit/verify`) — making the assistive boundary and the diagnosis's provenance auditable in code rather than by assertion (§3).
@@ -199,7 +199,7 @@ make verify         # synthetic localization: 5/5 at 100% ground truth
 make train-logdet   # HDFS: P 0.992 / R 0.564 / F1 0.719 / ROC-AUC 0.787
 make train-metricdet# SMD:  P 0.142 / R 0.403 / F1 0.210 / PA-F1 0.35
 make validate-rca   # PetShop: three-signal trade-off (all / test)
-make test           # 18/18 hermetic offline tests
+make test           # 44/44 hermetic offline tests
 ```
 Corpora, trained weights, and result cards are **git-ignored** (regenerated from source); the repository commits only the reproducible pipeline and the committed model cards served by `GET /validation`.
 
@@ -283,11 +283,12 @@ Top-1 (selective): OB delay/disk/mem 1.000, cpu 0.360, loss 0.640; TT cpu/mem 1.
 0.640. **Scope:** full RE1 only; RE2/RE3 not yet included. z = 3 / `min_metrics` were
 fixed a priori, not tuned on RCAEval.
 
-**Baseline context (no superiority claimed yet).** RCAEval implements 15 baselines (BARO,
-RCD, CIRCA, ε-Diagnosis, RUN, CausalRCA, MicroCause, TraceRCA, MicroRank, PDiagnose, …).
-We do **not** yet assert we beat them: a fair comparison must reproduce those baselines
-under the *same* candidate set and splits, which is the immediate next step. As a
-difficulty anchor only — *not* a comparison — prior work on the *harder* RE2 tier reports
+**Baseline context.** RCAEval implements 15 baselines (BARO, RCD, CIRCA, ε-Diagnosis,
+RUN, CausalRCA, MicroCause, TraceRCA, MicroRank, PDiagnose, …). §7.2c reproduces **two** of
+them — BARO and ε-Diagnosis — in our harness under the *same* candidate set and splits and
+reports the head-to-head; the remaining thirteen (several needing heavier dependencies) are
+future work. As a difficulty anchor only — *not* a comparison — prior work on the *harder*
+RE2 tier reports
 Avg@5 ≈ 0.46 (CIRCA) / 0.54 (RCD) / ~0.74–0.80 (BARO) on Train Ticket, and BARO's AC@1 on
 RE2-Online-Boutique is 0.144 (Avg@5 0.742), indicating exact top-1 is hard on these
 benchmarks. Those are RE2 numbers and are **not** comparable to our RE1 results.
@@ -374,7 +375,7 @@ Hypothesis ─► Experimental design ─► Initial results ─► Failures & c
 **Design.** Hold `causal_root` byte-identical; vary only the elevated signal; measure recall@k, coverage, and elevated-set size on the same 68 incidents; always report the held-out split.
 
 **Initial results and the failures that shaped them.**
-- *Blocked claim — detector numbers.* An early review cited log-detector P 0.94 / R 0.46 / F1 0.62 and "11/11 tests" as if measured; they were aspirational. **Lesson:** only commit numbers that come from a logged run. The repository now carries the *measured* 0.992/0.564/0.719 and the real test count (now 18).
+- *Blocked claim — detector numbers.* An early review cited log-detector P 0.94 / R 0.46 / F1 0.62 and "11/11 tests" as if measured; they were aspirational. **Lesson:** only commit numbers that come from a logged run. The repository now carries the *measured* 0.992/0.564/0.719 and the real test count (now 44).
 - *Parameter choice — SMD threshold.* SMD papers routinely select the threshold on the test set and report PA-F1 ≈ 0.8–0.9. We deliberately used a **train-only** threshold (point-wise F1 0.210) and flagged PA-F1 as oracle-dependent. **Lesson:** a smaller, non-leaky number is worth more than a large leaky one.
 - *Negative result that became a diagnostic.* Two-sided detection on the *target* metric changed nothing (H-check), which *proved* the missed incidents live in other metrics and re-attributed the gap to detection. A "nothing happened" experiment carried the most information.
 - *The coupling (H2 confirmed).* Broad within-domain detection over-elevated (4.4→8.8) and cost recall@1. Saturation, not a bug, was the cause.
@@ -464,7 +465,7 @@ Through-line: **the reasoning that must be trusted stays inspectable; learning i
 ## 15. Reproducibility
 
 - **Commands:** §6. **Evidence:** committed model cards behind `GET /validation`, `/log-anomaly`, `/metric-anomaly`, `/rca-validation`; git-ignored corpora/weights/cards regenerated via the `make` targets.
-- **Tests:** 18 hermetic, offline (incident agent; log detector; RCA harness incl. within-domain broad and selective; metric detector).
+- **Tests:** 44 hermetic, offline (incident agent; log + metric detectors; calibration metrics; RCA harness incl. within-domain broad and selective; RCAEval adapter; ActionProposal / audit log / VerdictPlane hand-off / enforcement).
 - **Determinism:** `causal_root` is pure and byte-identical across engine and harness.
 
 ---
@@ -511,4 +512,4 @@ Given confusion counts `TP, FP, FN`: `P = TP/(TP+FP)`, `R = TP/(TP+FN)`, `F1 = 2
 
 ## Appendix C — Evidence index
 
-`make verify` → synthetic 5/5 · `make train-logdet` → HDFS card · `make train-metricdet` → SMD card · `make validate-rca` → `artifacts/rca_validation_card.json` (three signals, all/test) · `make test` → 18/18 · served at `GET /validation`.
+`make verify` → synthetic 5/5 · `make train-logdet` → HDFS card · `make train-metricdet` → SMD card · `make validate-rca` → `artifacts/rca_validation_card.json` (three signals, all/test) · `make validate-rcaeval` → RE1 card · `make compare-baselines` → Sentinel vs BARO/ε-Diagnosis · `make test` → 44/44 · served at `GET /validation`.
