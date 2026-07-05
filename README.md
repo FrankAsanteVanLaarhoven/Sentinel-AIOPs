@@ -113,7 +113,7 @@ cd engine && DATA_SOURCE=prom PROM_URL=http://prometheus:9090 \
 - **[notebooks/Sentinel_AIOPs_Grandmaster.ipynb](notebooks/Sentinel_AIOPs_Grandmaster.ipynb)** — a runnable,
   Grandmaster-style walkthrough that reproduces the three-layer pipeline end to end.
 - `engine/README.md` · `console/README.md` — component detail.
-- Endpoint reference and model cards: `GET /investigate`, `/action-proposal` (typed VerdictPlane hand-off), `/handoff` (full propose→govern loop), `/audit` + `/audit/verify` (tamper-evident proposal provenance), `/validation`, `/log-anomaly`, `/metric-anomaly`, `/rca-validation`, `/rcaeval`.
+- Endpoint reference and model cards: `GET /investigate`, `/action-proposal` (typed VerdictPlane hand-off), `/handoff` (full propose→govern loop), `/audit` + `/audit/verify` (tamper-evident proposal provenance) + `/audit/export` (SIEM ECS/CEF), `/validation`, `/log-anomaly`, `/metric-anomaly`, `/rca-validation`, `/rcaeval`.
 - Benchmark detail: [engine/docs/RCAEVAL.md](engine/docs/RCAEVAL.md) — deterministic localization on the RCAEval corpus.
 
 ---

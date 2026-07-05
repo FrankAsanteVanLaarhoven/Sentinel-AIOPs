@@ -64,6 +64,10 @@ class AuditLog:
             return []
         return [json.loads(ln) for ln in self.path.read_text().splitlines() if ln.strip()]
 
+    def entries(self) -> list[dict]:
+        """All audit entries in append order (parsed; use verify() for integrity)."""
+        return self._entries()
+
     def head_hash(self) -> str:
         e = self._entries()
         return e[-1]["entry_hash"] if e else GENESIS

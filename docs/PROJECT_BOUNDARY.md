@@ -37,7 +37,8 @@ RCA**.
   to **VerdictPlane**.
 - **Record every proposal** to a **tamper-evident, hash-chained, optionally-signed** provenance
   log (`sentinel.audit_log`, queried at `GET /audit` / `GET /audit/verify`) — replayable by
-  `proposal_id` / `replay_id`, alteration of any past entry is detectable.
+  `proposal_id` / `replay_id`, alteration of any past entry is detectable, and **exportable to a
+  SIEM** (ECS / CEF, chain + signature preserved) via `GET /audit/export`.
 - **Report honestly** — measured numbers only; trade-offs and failure modes disclosed.
 
 ## Does NOT
@@ -109,7 +110,7 @@ diluting the diagnosis core:
 |---|---|---|
 | Observability | **partial** | OTel-native signals; engine is instrumentable |
 | Docs / benchmark repro | **done** | MANUSCRIPT, SENTINEL_PAPER, RCAEVAL, reproducible `make` |
-| Audit | **done** | hash-chained, optionally-signed provenance log of every `ActionProposal` (`/audit`, `/audit/verify`); SIEM export next |
+| Audit | **done** | hash-chained, optionally-signed provenance log of every `ActionProposal` (`/audit`, `/audit/verify`); SIEM export (ECS / CEF) via `/audit/export` + `make export-audit` |
 | Reliability | **next** | health checks, retries, fail-closed (already the policy default), rollback via VerdictPlane |
 | Security (SSO/RBAC/tenant) | later | open-core: free local engine, paid enterprise console |
 | Deployment (Helm/Terraform/air-gap) | later | Docker exists; packaging later |

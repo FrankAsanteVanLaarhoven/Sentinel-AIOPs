@@ -20,10 +20,12 @@ from pathlib import Path
 import numpy as np
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 
 from sentinel.incident_agent import detect, localize, find_root_cause, investigate, _baseline
 from sentinel.action_proposal import build_action_proposal
 from sentinel.audit_log import AuditLog
+from sentinel.siem_export import export as siem_export
 from sentinel.verdictplane import submit as vp_submit
 from sentinel.telemetry_sim import SERVICES, DEPS, N, INC, SLO_ERR
 from sentinel.tools import TelemetryTools
@@ -268,6 +270,17 @@ def api_audit(action_id: str | None = Query(None)):
 def api_audit_verify():
     """Re-walk the hash chain and report integrity (ok / first broken entry)."""
     return _AUDIT.verify()
+
+
+@app.get("/audit/export")
+def api_audit_export(format: str = Query("ecs")):
+    """SIEM export of the audit log — `format=ecs` (Elastic, NDJSON) or `cef` (ArcSight).
+    Preserves the hash chain + signature so a SIEM can re-verify provenance."""
+    try:
+        body = siem_export(_AUDIT.entries(), format)
+    except ValueError as exc:
+        return {"error": str(exc)}
+    return PlainTextResponse(body, media_type="application/x-ndjson")
 
 
 @app.get("/topology")
