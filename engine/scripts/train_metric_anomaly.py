@@ -28,7 +28,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import numpy as np  # noqa: E402
+from sklearn.isotonic import IsotonicRegression  # noqa: E402
+from sklearn.model_selection import train_test_split  # noqa: E402
 
+from sentinel.calibration import calibration_report  # noqa: E402
 from sentinel.metric_anomaly import (  # noqa: E402
     QUANTILE_DEFAULT,
     SMOOTH_DEFAULT,
@@ -69,7 +72,7 @@ def main() -> int:
     print(f"SMD metric-anomaly · {len(ms)} machine(s) · PCA(var={VAR_DEFAULT}) "
           f"smooth={SMOOTH_DEFAULT} thr=train-q{QUANTILE_DEFAULT}\n")
 
-    preds, labels = [], []
+    preds, labels, escores = [], [], []
     for m in ms:
         train = np.loadtxt(fetch("train", m), delimiter=",")
         test = np.loadtxt(fetch("test", m), delimiter=",")
@@ -77,11 +80,25 @@ def main() -> int:
         det = MetricAnomalyDetector().fit(train)
         preds.append(det.predict(test))
         labels.append(label)
+        escores.append(det.score(test) / det.threshold)  # error / train threshold (1.0 at boundary)
 
     pred = np.concatenate(preds)
     label = np.concatenate(labels)
     p, r, f = prf(pred, label)
     _, _, paf = prf(point_adjust(pred, label), label)
+
+    # Calibration: unlike the log detector, this model emits a reconstruction ERROR,
+    # not a probability. Read its own decision boundary as a pseudo-probability
+    # p = e/(1+e), e = error/threshold (p = 0.5 exactly at the threshold), measure its
+    # calibration, then test whether isotonic recalibration (error/threshold -> label,
+    # fit on a disjoint half of the pooled test points) helps.
+    e = np.concatenate(escores)
+    e_fit, e_eval, y_fit, y_eval = train_test_split(
+        e, label, test_size=0.50, random_state=42, stratify=label
+    )
+    iso = IsotonicRegression(out_of_bounds="clip").fit(e_fit, y_fit)
+    raw = calibration_report(y_eval, e_eval / (1.0 + e_eval))
+    isot = calibration_report(y_eval, iso.predict(e_eval))
 
     card = {
         "dataset": "NetManAIOps/OmniAnomaly · Server Machine Dataset (SMD)",
@@ -95,6 +112,15 @@ def main() -> int:
             "recall": round(r, 3),
             "f1": round(f, 3),
             "f1_point_adjusted": round(paf, 3),
+        },
+        "calibration": {
+            "starts_from": ("PCA reconstruction error (not a probability); pseudo-prob "
+                            "p = e/(1+e), e = smoothed error / train threshold (0.5 at the boundary)"),
+            "eval_n": int(len(y_eval)),
+            "raw_pseudo_prob": raw,
+            "after_isotonic": isot,
+            "note": ("isotonic (error/threshold -> label) fit on a disjoint half of the "
+                     "pooled test points, evaluated on the other half"),
         },
         "caveats": [
             "Unsupervised: threshold set from the training error distribution, "
@@ -112,6 +138,10 @@ def main() -> int:
     print(f"POOLED ({card['test_points']:,} points, {card['anomaly_rate']*100:.1f}% anomalous):")
     print(f"  precision {mt['precision']} · recall {mt['recall']} · F1 {mt['f1']} "
           f"· point-adjusted F1 {mt['f1_point_adjusted']}")
+    cal = card["calibration"]
+    print(f"CALIBRATION (pseudo-prob from recon-error): raw ECE {cal['raw_pseudo_prob']['ece']} "
+          f"· Brier {cal['raw_pseudo_prob']['brier']} -> isotonic ECE {cal['after_isotonic']['ece']} "
+          f"· Brier {cal['after_isotonic']['brier']}")
     print(f"  card -> artifacts/metric_anomaly_card.json · {time.time()-t0:.1f}s")
     return 0
 
