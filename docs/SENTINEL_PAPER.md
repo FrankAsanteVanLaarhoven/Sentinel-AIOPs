@@ -41,10 +41,10 @@ The separation buys three things a fused pipeline cannot. (i) **Auditability** �
 ### 1.4 Contributions
 
 - **C1.** A three-layer AIOps architecture with an enforced learned/deterministic boundary and a single queryable interface (`GET /validation`) that surfaces all three layers' provenance from committed cards without running any pipeline (§3, §11).
-- **C2.** Independent, held-out measurements of two learned detectors on real public corpora — HDFS logs (F1 0.719) and SMD metrics (F1 0.210 / PA-F1 0.35) — with the point-adjust caveat treated as an oracle-leakage boundary, not a headline (§4, §7).
+- **C2.** Independent, held-out measurements of two learned detectors on real public corpora — HDFS logs (F1 0.719; and **well-calibrated**: ECE 0.0009 / Brier 0.021, isotonic recalibration measured to be unnecessary) and SMD metrics (F1 0.210 / PA-F1 0.35) — with the point-adjust caveat treated as an oracle-leakage boundary, not a headline (§4, §7, §7.1b).
 - **C3.** An empirical validation of a *training-free* causal-localization rule on the public PetShop corpus (recall@1 0.265 / recall@3 0.471, coverage 0.706), with the rule reused verbatim from the production engine (§7).
 - **C4.** A controlled ablation of the detection↔localization coupling: target vs. broad vs. multivariate-selective elevated signals, reported on both the combined and held-out splits, yielding the measured conclusion that within-domain detection closes the coverage gap but does not restore localization precision on held-out data (§7, §8).
-- **C5.** A reproducible, offline artifact: 18 hermetic tests, `make` targets that regenerate every number, and a documented claim boundary (§6, §9, §11).
+- **C5.** A reproducible, offline artifact: 44 hermetic tests, `make` targets that regenerate every number, and a documented claim boundary (§6, §9, §11).
 - **C6.** A typed, evidence-linked hand-off contract (`ActionProposal`) that carries a *measured* evidence-grounding ratio and is propose-only / fail-closed / human-gated by construction, together with a tamper-evident, hash-chained, optionally-signed provenance log of every proposal (`GET /audit`, `/audit/verify`) — making the assistive boundary and the diagnosis's provenance auditable in code rather than by assertion (§3).
 
 ---
@@ -216,6 +216,18 @@ Corpora, trained weights, and result cards are **git-ignored** (regenerated from
 
 The log detector is high-precision / moderate-recall — a trustworthy-when-it-fires signal. The metric detector's point-wise F1 is deliberately modest because the threshold is train-only; the PA-F1 of 0.35 is reported for comparability and explicitly flagged as an optimistic, oracle-dependent upper bound (§2.3, §4, §9).
 
+### 7.1b Detector calibration (does a 0.9 score mean ~90%?)
+
+An accurate detector can still be *miscalibrated* — its confidence not matching its hit rate. We measure this on the log detector's held-out `predict_proba` (n = 32,415), using Expected Calibration Error (ECE), Maximum Calibration Error (MCE), and the Brier score (10 equal-width bins), and test whether post-hoc **isotonic recalibration** (fit on a disjoint half of the held-out set, evaluated on the other half) improves it.
+
+| | Brier | ECE | MCE |
+|---|---:|---:|---:|
+| Log detector, held-out | **0.0213** | **0.0009** | 0.5535 |
+| — eval half, before isotonic | 0.0207 | 0.0004 | 0.5535 |
+| — eval half, after isotonic | 0.0207 | 0.0010 | 0.6535 |
+
+**Measured finding: the logistic detector is already well-calibrated in aggregate, and recalibration is unnecessary.** ECE is < 0.001 and Brier is 0.021, so its probabilities can be consumed as-is (relevant to Paper 2, where the detector's confidence is used as a soft elevated-magnitude). Isotonic recalibration does **not** improve it — ECE and Brier are unchanged, and the tail (MCE) gets *worse* — so we do not apply it. **Two honest caveats.** (i) With a 4.95% anomaly base rate, the aggregate ECE is dominated by a large, well-calibrated low-probability mass; the high **MCE (0.55)** shows a single sparse high-confidence bin whose accuracy diverges — worst-case calibration is *not* as good as the average. (ii) These are the log detector's numbers; the PCA metric detector emits a reconstruction *error*, not a probability, so calibrating it requires a score→probability mapping and is left as future work (§13). Reproduce: `make train-logdet` writes the `calibration` block to `artifacts/log_anomaly_card.json`; metrics implemented in `sentinel.calibration` (5 hermetic tests).
+
 ### 7.2 Deterministic localization
 
 **Synthetic:** 5/5 scenarios localize to the correct root (100% ground-truth agreement) — a sanity floor showing the rule is correct where the graph is clean.
@@ -340,11 +352,12 @@ Three measured facts, in order:
 
 | Layer | Component | Corpus | Headline (held-out) |
 |---|---|---|---|
-| Detection (learned) | log detector | HDFS | F1 0.719 (P 0.992, R 0.564, AUC 0.787) |
+| Detection (learned) | log detector | HDFS | F1 0.719 (P 0.992, R 0.564, AUC 0.787); calibrated ECE 0.0009 / Brier 0.021 |
 | Detection (learned) | metric detector | SMD | F1 0.210 / PA-F1 0.35 (train-only threshold) |
 | Localization (deterministic) | `causal_root` | synthetic | 5/5 |
 | Localization (deterministic) | `causal_root` | PetShop | recall@1 0.265 / recall@3 0.471, coverage 0.706 |
-| System | full suite | — | 18/18 hermetic tests |
+| Localization (deterministic) | `causal_root` | RCAEval RE1 | AC@1 0.845 / Avg@5 0.900 (375 cases); beats reproduced BARO on AC@1 |
+| System | full suite | — | 44/44 hermetic tests |
 
 ---
 

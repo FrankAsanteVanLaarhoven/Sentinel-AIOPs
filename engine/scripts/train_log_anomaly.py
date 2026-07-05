@@ -33,8 +33,10 @@ from sklearn.metrics import (  # noqa: E402
     recall_score,
     roc_auc_score,
 )
+from sklearn.isotonic import IsotonicRegression  # noqa: E402
 from sklearn.model_selection import train_test_split  # noqa: E402
 
+from sentinel.calibration import calibration_report  # noqa: E402
 from sentinel.log_anomaly import LogAnomalyDetector, event_template  # noqa: E402
 
 REPO = "logfit-project/HDFS_v1"
@@ -75,6 +77,18 @@ def main() -> int:
     det.fit_features(Xtr, ytr)
     proba = det.model.predict_proba(Xte)[:, 1]
     pred = (proba >= det.threshold).astype(int)
+
+    # Calibration: is a 0.9 score right ~90% of the time? Measure ECE/Brier on the
+    # held-out probabilities, then recalibrate with isotonic regression fit on a
+    # DISJOINT half of the held-out set and evaluated on the other half (so the
+    # before/after comparison is on identical, unseen data).
+    uncal = calibration_report(yte, proba)
+    p_fit, p_eval, y_fit, y_eval = train_test_split(
+        proba, yte, test_size=0.50, random_state=42, stratify=yte
+    )
+    iso = IsotonicRegression(out_of_bounds="clip").fit(p_fit, y_fit)
+    before = calibration_report(y_eval, p_eval)
+    after = calibration_report(y_eval, iso.predict(p_eval))
     card = {
         "dataset": REPO,
         "shards_used": SHARDS,
@@ -88,6 +102,16 @@ def main() -> int:
             "recall": round(float(recall_score(yte, pred)), 3),
             "f1": round(float(f1_score(yte, pred)), 3),
             "roc_auc": round(float(roc_auc_score(yte, proba)), 3),
+        },
+        "calibration": {
+            "held_out": uncal,  # ECE/Brier of predict_proba on the full held-out set
+            "isotonic_recalibration": {
+                "eval_n": int(len(y_eval)),
+                "before": before,
+                "after": after,
+            },
+            "note": ("ECE/Brier on held-out predict_proba; isotonic fit on a disjoint "
+                     "half of the held-out set, evaluated on the other half."),
         },
         "caveats": [
             "Bag-of-events discards intra-session order; sequence models "
@@ -106,6 +130,12 @@ def main() -> int:
         f"\nHELD-OUT (n={card['sessions_heldout']:,}): "
         f"precision {m['precision']} · recall {m['recall']} · "
         f"f1 {m['f1']} · roc_auc {m['roc_auc']}"
+    )
+    c = card["calibration"]
+    print(
+        f"CALIBRATION: held-out ECE {c['held_out']['ece']} · Brier {c['held_out']['brier']} "
+        f"| isotonic ECE {c['isotonic_recalibration']['before']['ece']} -> "
+        f"{c['isotonic_recalibration']['after']['ece']}"
     )
     print(f"  saved -> artifacts/log_anomaly.joblib · artifacts/log_anomaly_card.json")
     print(f"  done in {time.time() - t0:.1f}s")
